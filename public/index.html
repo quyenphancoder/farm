@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#173b2c" />
+    <title>Sunny Farm</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="game-app">
+      <section class="game-stage" aria-label="Nông trại Sunny Farm">
+        <div id="game-container"></div>
+        <div class="scene-vignette" aria-hidden="true"></div>
+
+        <header class="top-hud">
+          <button class="profile-card" type="button" onclick="toggleProfile()">
+            <span class="avatar"><img id="player-avatar" alt="Nông dân SunnyFarm" /></span>
+            <span class="profile-copy">
+              <strong id="player-display">SunnyFarm</strong>
+              <small>Lv. 1</small>
+              <span class="xp-track"><i style="width:65%"></i></span>
+            </span>
+          </button>
+
+          <form id="profile-editor" class="profile-editor" hx-post="/api/auth/login"
+            hx-target="#welcome" hx-on::after-request="updatePlayerName(this)">
+            <label for="player-name">Tên nông trại</label>
+            <div>
+              <input id="player-name" name="name" maxlength="30" value="SunnyFarm" />
+              <button type="submit">Lưu</button>
+            </div>
+          </form>
+
+          <div id="resource-hud" class="resource-hud"
+            hx-get="/api/game/hud" hx-trigger="load, farm:changed from:body">
+            <span class="resource-pill">Đang tải…</span>
+          </div>
+
+          <nav class="top-actions" aria-label="Tính năng">
+            <button class="quick-action" type="button" hx-get="/api/game/events" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')"><span>🎁</span><small>Sự kiện</small><b>3</b></button>
+            <button class="quick-action" type="button" hx-get="/api/game/quests" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')"><span>📜</span><small>Nhiệm vụ</small></button>
+            <button class="quick-action" type="button" hx-get="/api/shop" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')"><span>🏪</span><small>Cửa hàng</small></button>
+            <button class="quick-action" type="button" hx-get="/api/game/map" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')"><span>🗺️</span><small>Bản đồ</small></button>
+            <button class="menu-button" type="button" aria-expanded="false"
+              onclick="toggleQuickMenu(this)"><span>☰</span><i></i></button>
+          </nav>
+        </header>
+
+        <aside class="side-rail glass-panel" aria-label="Menu nhanh">
+          <button type="button" hx-get="/api/game/inventory" hx-target="#drawer-content"
+            hx-on:click="openDrawer('popup')"><span>🎒</span><small>Kho đồ</small></button>
+          <button type="button"><span>⭐</span><small>Kỹ năng</small></button>
+          <button type="button"><span>🐶</span><small>Thú cưng</small></button>
+          <button type="button"><span>👨‍👩‍👧</span><small>Bạn bè</small></button>
+        </aside>
+
+        <div class="message-bar glass-panel">
+          <span class="message-icon">💬</span>
+          <div>
+            <strong>Chào mừng đến với Sunny Farm!</strong>
+            <p id="welcome">Chuột phải để di chuyển • Chuột trái để tương tác.</p>
+          </div>
+        </div>
+
+        <div id="drawer-backdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
+        <aside id="game-drawer" class="game-drawer" aria-label="Bảng thông tin">
+          <button class="drawer-close" type="button" onclick="closeDrawer()">×</button>
+          <div id="drawer-content"><div class="drawer-loading">Đang tải…</div></div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      function openDrawer(mode) {
+        const drawer = document.getElementById("game-drawer");
+        drawer.classList.toggle("center-popup", mode === "popup");
+        drawer.classList.add("open");
+        document.getElementById("drawer-backdrop").classList.add("open");
+        closeQuickMenu();
+      }
+      function closeDrawer() {
+        document.getElementById("game-drawer").classList.remove("open");
+        document.getElementById("drawer-backdrop").classList.remove("open");
+      }
+      function toggleProfile() {
+        document.getElementById("profile-editor").classList.toggle("open");
+      }
+      function toggleQuickMenu(button) {
+        const menu = button.closest(".top-actions");
+        const isOpen = menu.classList.toggle("open");
+        button.setAttribute("aria-expanded", String(isOpen));
+      }
+      function closeQuickMenu() {
+        const menu = document.querySelector(".top-actions");
+        const button = menu.querySelector(".menu-button");
+        menu.classList.remove("open");
+        button.setAttribute("aria-expanded", "false");
+      }
+      function selectShopItem(button) {
+        document.querySelectorAll(".shop-product").forEach((item) =>
+          item.classList.remove("selected")
+        );
+        button.classList.add("selected");
+        const purchase = document.getElementById("shop-purchase");
+        purchase.hidden = false;
+        purchase.dataset.unitPrice = button.dataset.price;
+        document.getElementById("selected-product-name").textContent = button.dataset.name;
+        document.getElementById("shop-quantity").value = 1;
+        updateShopTotal();
+      }
+      function changeShopQuantity(change) {
+        const input = document.getElementById("shop-quantity");
+        input.value = Math.max(1, Math.min(99, Number(input.value || 1) + change));
+        updateShopTotal();
+      }
+      function updateShopTotal() {
+        const purchase = document.getElementById("shop-purchase");
+        const input = document.getElementById("shop-quantity");
+        const quantity = Math.max(1, Math.min(99, Number(input.value || 1)));
+        input.value = quantity;
+        document.getElementById("shop-total").textContent =
+          `${quantity * Number(purchase.dataset.unitPrice)} xu`;
+      }
+      function updatePlayerName(form) {
+        document.getElementById("player-display").textContent =
+          new FormData(form).get("name") || "SunnyFarm";
+        form.classList.remove("open");
+      }
+    </script>
+    <script type="module" src="/game/main.js"></script>
+  </body>
+</html>
