@@ -1,21 +1,27 @@
 export default class Player {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.baseScale = .34;
+    this.baseScaleX = .36;
+    this.baseScaleY = .31;
     this.lastDirection = "down";
     this.actionUntil = 0;
-    this.sprite = scene.physics.add.sprite(x, y, "farmer", "down-0");
+    this.sprite = scene.physics.add.sprite(x, y, "farmer-down-0");
     this.sprite
       .setOrigin(.55, .91)
-      .setScale(this.baseScale)
+      .setScale(this.baseScaleX, this.baseScaleY)
       .setCollideWorldBounds(true)
       .setDepth(10);
-    this.sprite.body.setSize(72, 48).setOffset(94, 230);
+    this.shadowOffsetX = this.sprite.originX - .5;
+    this.sprite.body.setSize(54, 34).setOffset(42, 176);
+    this.shadow = scene.add.ellipse(x, y + 5, 34, 12, 0x102015, .28)
+      .setDepth(9);
     this.createAnimations();
 
     this.cursors = scene.input.keyboard.createCursorKeys();
     this.wasd = scene.input.keyboard.addKeys("W,A,S,D");
     this.moveTarget = null;
+    this.moveSpeed = 190;
+    this.arrivalRadius = 3;
 
     this.marker = scene.add.circle(x, y, 13, 0xffe787, .22)
       .setStrokeStyle(3, 0xfff2a8, .9)
@@ -40,71 +46,74 @@ export default class Player {
     for (const direction of ["down", "up", "left", "right"]) {
       const key = `farmer-walk-${direction}`;
       if (this.scene.anims.exists(key)) continue;
-      const sequence = [0, 1, 2, 3, 4, 3, 2, 1];
+      const sequence = [1, 2, 3, 4];
       this.scene.anims.create({
         key,
         frames: sequence.map((index) => ({
-          key: "farmer",
-          frame: `${direction}-${index}`
+          key: `farmer-${direction}-${index}`
         })),
-        frameRate: 10,
+        frameRate: 5,
         repeat: -1
       });
     }
   }
 
-  update() {
+  update(delta = 16.67) {
     if (this.scene.time.now < this.actionUntil) {
       this.sprite.setVelocity(0);
+      this.updateShadow();
       return;
     }
     if (this.actionUntil) {
       this.actionUntil = 0;
-      this.sprite.setScale(this.baseScale);
+      this.sprite.setScale(this.baseScaleX, this.baseScaleY);
       this.setIdleFrame();
     }
 
-    const speed = 190;
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;
     const up = this.cursors.up.isDown || this.wasd.W.isDown;
     const down = this.cursors.down.isDown || this.wasd.S.isDown;
-    let keyboardX = Number(right) - Number(left);
-    let keyboardY = Number(down) - Number(up);
-
-    // Four-direction movement: never allow velocity on both axes.
-    if (keyboardX) keyboardY = 0;
+    const keyboardX = Number(right) - Number(left);
+    const keyboardY = Number(down) - Number(up);
 
     if (keyboardX || keyboardY) {
       this.cancelMove();
-      this.sprite.setVelocity(keyboardX * speed, keyboardY * speed);
+      this.moveByKeyboard(keyboardX, keyboardY);
     } else if (this.moveTarget) {
-      const deltaX = this.moveTarget.x - this.sprite.x;
-      const deltaY = this.moveTarget.y - this.sprite.y;
-      if (Math.abs(deltaX) <= 7 && Math.abs(deltaY) <= 7) {
-        this.sprite.setPosition(this.moveTarget.x, this.moveTarget.y);
-        this.sprite.setVelocity(0);
-        this.cancelMove();
-      } else {
-        if (this.moveTarget.axis === "x" && Math.abs(deltaX) <= 7) {
-          this.sprite.setX(this.moveTarget.x);
-          this.moveTarget.axis = "y";
-        } else if (this.moveTarget.axis === "y" && Math.abs(deltaY) <= 7) {
-          this.sprite.setY(this.moveTarget.y);
-          this.moveTarget.axis = "x";
-        }
-
-        if (this.moveTarget.axis === "x") {
-          this.sprite.setVelocity(Math.sign(this.moveTarget.x - this.sprite.x) * speed, 0);
-        } else {
-          this.sprite.setVelocity(0, Math.sign(this.moveTarget.y - this.sprite.y) * speed);
-        }
-      }
+      this.moveTowardTarget(delta);
     } else {
       this.sprite.setVelocity(0);
     }
 
     this.updateAnimation();
+    this.updateShadow();
+  }
+
+  moveByKeyboard(x, y) {
+    const length = Math.hypot(x, y) || 1;
+    this.sprite.setVelocity(
+      (x / length) * this.moveSpeed,
+      (y / length) * this.moveSpeed
+    );
+  }
+
+  moveTowardTarget(delta) {
+    const deltaX = this.moveTarget.x - this.sprite.x;
+    const deltaY = this.moveTarget.y - this.sprite.y;
+    const distance = Math.hypot(deltaX, deltaY);
+    const step = this.moveSpeed * (delta / 1000);
+
+    if (distance <= Math.max(this.arrivalRadius, step)) {
+      this.sprite.setPosition(this.moveTarget.x, this.moveTarget.y);
+      this.sprite.setVelocity(0);
+      this.cancelMove();
+      return;
+    }
+
+    const velocityX = (deltaX / distance) * this.moveSpeed;
+    const velocityY = (deltaY / distance) * this.moveSpeed;
+    this.sprite.setVelocity(velocityX, velocityY);
   }
 
   updateAnimation() {
@@ -124,7 +133,19 @@ export default class Player {
 
   setIdleFrame() {
     if (this.sprite.anims.isPlaying) this.sprite.anims.stop();
-    this.sprite.setFrame(`${this.lastDirection}-0`);
+    this.sprite.setTexture(`farmer-${this.lastDirection}-0`);
+  }
+
+  updateShadow() {
+    const textureWidth = this.sprite.displayWidth / Math.abs(this.sprite.scaleX || 1);
+    const centerX = this.sprite.x - textureWidth * this.sprite.scaleX * this.shadowOffsetX;
+    this.shadow
+      .setPosition(centerX, this.sprite.y + 5)
+      .setScale(
+        Math.abs(this.sprite.scaleX) / this.baseScaleX,
+        Math.abs(this.sprite.scaleY) / this.baseScaleY
+      )
+      .setVisible(this.sprite.visible);
   }
 
   playAction(targetX, targetY, duration = 500) {
@@ -139,8 +160,8 @@ export default class Player {
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.add({
       targets: this.sprite,
-      scaleX: this.baseScale * 1.08,
-      scaleY: this.baseScale * .92,
+      scaleX: this.baseScaleX * 1.08,
+      scaleY: this.baseScaleY * .92,
       duration: 125,
       yoyo: true,
       repeat: 1
@@ -156,10 +177,7 @@ export default class Player {
 
     this.moveTarget = {
       x: targetX,
-      y: targetY,
-      axis: Math.abs(targetX - this.sprite.x) >= Math.abs(targetY - this.sprite.y)
-        ? "x"
-        : "y"
+      y: targetY
     };
     this.marker.setPosition(targetX, targetY).setVisible(true);
   }

@@ -37,9 +37,20 @@ db.exec(`
     PRIMARY KEY (player_id, plot_id),
     FOREIGN KEY (player_id) REFERENCES players(id)
   );
+  CREATE TABLE IF NOT EXISTS unlocked_plots (
+    player_id INTEGER NOT NULL,
+    plot_id INTEGER NOT NULL,
+    PRIMARY KEY (player_id, plot_id),
+    FOREIGN KEY (player_id) REFERENCES players(id)
+  );
 `);
 
 db.prepare("INSERT OR IGNORE INTO players (id, name, coins) VALUES (1, 'Nông dân', 100)").run();
+ensurePlayerColumn(db, "diamonds", "INTEGER NOT NULL DEFAULT 320");
+ensurePlayerColumn(db, "unlocked_rows", "INTEGER NOT NULL DEFAULT 1");
+for (let plotId = 0; plotId < 5; plotId += 1) {
+  db.prepare("INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id) VALUES (1, ?)").run(plotId);
+}
 db.prepare("INSERT OR IGNORE INTO inventory (player_id, item, quantity) VALUES (1, 'carrot_seed', 5)").run();
 
 app.locals.db = db;
@@ -66,3 +77,9 @@ process.on("SIGINT", () => {
   db.close();
   process.exit(0);
 });
+
+function ensurePlayerColumn(db, name, definition) {
+  const columns = db.prepare("PRAGMA table_info(players)").all();
+  if (columns.some((column) => column.name === name)) return;
+  db.exec(`ALTER TABLE players ADD COLUMN ${name} ${definition}`);
+}

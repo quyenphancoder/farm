@@ -29,7 +29,7 @@
           </button>
 
           <form id="profile-editor" class="profile-editor" hx-post="/api/auth/login"
-            hx-target="#welcome" hx-on::after-request="updatePlayerName(this)">
+            hx-swap="none" hx-on::after-request="updatePlayerName(this)">
             <label for="player-name">Tên nông trại</label>
             <div>
               <input id="player-name" name="name" maxlength="30" value="SunnyFarm" />
@@ -49,28 +49,14 @@
               hx-on:click="openDrawer('popup')"><span>📜</span><small>Nhiệm vụ</small></button>
             <button class="quick-action" type="button" hx-get="/api/shop" hx-target="#drawer-content"
               hx-on:click="openDrawer('popup')"><span>🏪</span><small>Cửa hàng</small></button>
+            <button class="quick-action" type="button" hx-get="/api/game/inventory" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')"><span>🎒</span><small>Kho đồ</small></button>
             <button class="quick-action" type="button" hx-get="/api/game/map" hx-target="#drawer-content"
               hx-on:click="openDrawer('popup')"><span>🗺️</span><small>Bản đồ</small></button>
             <button class="menu-button" type="button" aria-expanded="false"
               onclick="toggleQuickMenu(this)"><span>☰</span><i></i></button>
           </nav>
         </header>
-
-        <aside class="side-rail glass-panel" aria-label="Menu nhanh">
-          <button type="button" hx-get="/api/game/inventory" hx-target="#drawer-content"
-            hx-on:click="openDrawer('popup')"><span>🎒</span><small>Kho đồ</small></button>
-          <button type="button"><span>⭐</span><small>Kỹ năng</small></button>
-          <button type="button"><span>🐶</span><small>Thú cưng</small></button>
-          <button type="button"><span>👨‍👩‍👧</span><small>Bạn bè</small></button>
-        </aside>
-
-        <div class="message-bar glass-panel">
-          <span class="message-icon">💬</span>
-          <div>
-            <strong>Chào mừng đến với Sunny Farm!</strong>
-            <p id="welcome">Chuột phải để di chuyển • Chuột trái để tương tác.</p>
-          </div>
-        </div>
 
         <div id="drawer-backdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
         <aside id="game-drawer" class="game-drawer" aria-label="Bảng thông tin">

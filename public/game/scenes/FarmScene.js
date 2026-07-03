@@ -9,7 +9,9 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   async create() {
-    this.add.image(480, 300, "farm-background").setDisplaySize(960, 640);
+    this.background = this.add.image(480, 300, "farm-background").setDisplaySize(960, 640);
+    this.resizeView();
+    this.scale.on("resize", () => this.resizeView());
     this.physics.world.setBounds(42, 205, 876, 335);
 
     // Soft playable-area glow keeps plots readable on the detailed background.
@@ -28,8 +30,17 @@ export default class FarmScene extends Phaser.Scene {
     this.scene.launch("UIScene");
   }
 
-  update() {
-    this.player?.update();
+  update(_time, delta) {
+    this.player?.update(delta);
     this.crops?.update();
+  }
+
+  resizeView() {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const zoom = Math.max(width / 960, height / 600);
+    this.cameras.main.setViewport(0, 0, width, height);
+    this.cameras.main.setZoom(zoom);
+    this.cameras.main.centerOn(480, 300);
   }
 }

@@ -24,8 +24,8 @@ new Phaser.Game({
     arcade: { debug: false }
   },
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.NO_CENTER
   },
   scene: [PreloadScene, FarmScene, UIScene]
 });

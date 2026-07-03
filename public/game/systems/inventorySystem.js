@@ -5,11 +5,12 @@ export default class InventorySystem {
     return response.json();
   }
 
-  async request(url) {
+  async request(url, body = null) {
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined
       });
       return await response.json();
     } catch {
