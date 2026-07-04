@@ -10,87 +10,436 @@
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="game-app">
-      <section class="game-stage" aria-label="Nông trại Sunny Farm">
+      <section class="game-stage" aria-label="Nông trại Sunny Farm" data-i18n-aria-label="game.farmLabel">
         <div id="game-container"></div>
         <div class="scene-vignette" aria-hidden="true"></div>
 
-        <header class="top-hud">
-          <button class="profile-card" type="button" onclick="toggleProfile()">
-            <span class="avatar"><img id="player-avatar" alt="Nông dân SunnyFarm" /></span>
-            <span class="profile-copy">
-              <strong id="player-display">SunnyFarm</strong>
-              <small>Lv. 1</small>
-              <span class="xp-track"><i style="width:65%"></i></span>
-            </span>
-          </button>
+        <div id="start-screen" class="start-screen" role="dialog" aria-modal="true"
+          aria-labelledby="start-title">
+          <section class="start-card">
+            <span class="start-emblem" aria-hidden="true">🌻</span>
+            <label class="language-picker">
+              <select id="language-select" aria-label="Language" onchange="changeLanguage(this.value)">
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <p class="start-eyebrow" data-i18n="start.welcome">Chào mừng trở lại</p>
+            <h1 id="start-title">Sunny Farm</h1>
+            <p id="start-message" class="start-message" data-i18n="start.finding">Đang tìm nông trại của bạn…</p>
 
-          <form id="profile-editor" class="profile-editor" hx-post="/api/auth/login"
-            hx-swap="none" hx-on::after-request="updatePlayerName(this)">
-            <label for="player-name">Tên nông trại</label>
-            <div>
-              <input id="player-name" name="name" maxlength="30" value="SunnyFarm" />
-              <button type="submit">Lưu</button>
+            <div id="start-choices" class="start-choices">
+              <button id="continue-button" class="start-button continue" type="button"
+                onclick="continueGame()" disabled>
+                <span>▶</span>
+                <strong data-i18n="start.continue">Chơi tiếp</strong>
+              </button>
+              <button id="restart-button" class="start-button restart" type="button"
+                onclick="showNewGameForm()" disabled>
+                <span>↻</span>
+                <strong data-i18n="start.restart">Chơi lại</strong>
+              </button>
+              <button id="online-button" class="start-button online" type="button"
+                onclick="showOnlineMenu()" disabled>
+                <span>⚔</span>
+                <strong data-i18n="start.online">Đấu online</strong>
+              </button>
             </div>
-          </form>
 
-          <div id="resource-hud" class="resource-hud"
-            hx-get="/api/game/hud" hx-trigger="load, farm:changed from:body">
-            <span class="resource-pill">Đang tải…</span>
+            <form id="new-game-form" class="start-new-form" onsubmit="startNewGame(event)" hidden>
+              <label for="new-player-name" data-i18n="restart.name">Tên nhân vật mới</label>
+              <input id="new-player-name" name="name" maxlength="30" required
+                autocomplete="off" placeholder="Nhập tên nhân vật…"
+                data-i18n-placeholder="restart.placeholder" />
+              <p class="reset-warning" data-i18n="restart.warning">Tiến trình cũ sẽ bị xoá vĩnh viễn.</p>
+              <p id="start-error" class="start-error" role="alert"></p>
+              <div class="start-form-actions">
+                <button class="start-back" type="button" onclick="hideNewGameForm()" data-i18n="common.back">Quay lại</button>
+                <button class="start-confirm" type="submit" data-i18n="restart.confirm">Bắt đầu lại</button>
+              </div>
+            </form>
+
+            <section id="online-menu" class="online-menu" hidden>
+              <h2 data-i18n="online.title">Đấu online</h2>
+              <p data-i18n="online.subtitle">Tạo phòng mới hoặc nhập mã phòng của bạn bè.</p>
+              <button id="create-room-button" class="online-create" type="button"
+                onclick="createOnlineRoom()" data-i18n="online.create">＋ Tạo phòng mới</button>
+              <div class="online-divider"><span data-i18n="online.or">hoặc</span></div>
+              <form class="online-join" onsubmit="joinOnlineRoom(event)">
+                <label for="online-room-id" data-i18n="online.roomCode">Mã phòng</label>
+                <div>
+                  <input id="online-room-id" name="roomId" maxlength="6"
+                    autocomplete="off" placeholder="VD: FARM24" required
+                    data-i18n-placeholder="online.roomPlaceholder" />
+                  <button type="submit" data-i18n="online.join">Vào phòng</button>
+                </div>
+              </form>
+              <p id="online-error" class="start-error" role="alert"></p>
+              <button class="online-back" type="button" onclick="hideOnlineMenu()">← <span data-i18n="common.back">Quay lại</span></button>
+            </section>
+
+            <section id="online-room" class="online-room" hidden>
+              <p class="room-label" data-i18n="online.roomCode">Mã phòng</p>
+              <button id="room-code" class="room-code" type="button"
+                onclick="copyRoomCode()" title="Sao chép mã phòng"
+                data-i18n-title="online.copyTitle"></button>
+              <p id="room-status" class="room-status" data-i18n="online.waiting">Đang chờ người chơi…</p>
+              <div id="online-player-list" class="online-player-list"></div>
+              <p class="online-coming-soon" data-i18n="online.comingSoon">Danh sách nhiệm vụ đối kháng sẽ được nối ở bước tiếp theo.</p>
+              <button class="online-back" type="button" onclick="leaveOnlineRoom()" data-i18n="online.leave">Rời phòng</button>
+            </section>
+          </section>
+        </div>
+
+        <header class="top-hud">
+          <div class="profile-panel">
+            <div class="profile-card">
+              <span class="avatar"><img id="player-avatar" alt="Nông dân SunnyFarm" data-i18n-alt="game.avatarAlt" /></span>
+              <span class="profile-copy">
+                <strong id="player-display">SunnyFarm</strong>
+                <small id="player-level" data-i18n="common.level" data-i18n-level="1">Cấp 1</small>
+                <span id="player-xp-track" class="xp-track" aria-label="XP 0/100">
+                  <i id="player-xp-fill" style="width:0%"></i>
+                </span>
+              </span>
+            </div>
+
+            <div id="resource-hud" class="resource-hud"
+              hx-get="/api/game/hud" hx-trigger="load, farm:changed from:body">
+              <span class="resource-pill" data-i18n="common.loading">Đang tải…</span>
+            </div>
           </div>
 
-          <nav class="top-actions" aria-label="Tính năng">
+          <nav class="top-actions" aria-label="Tính năng" data-i18n-aria-label="nav.features">
             <button class="quick-action" type="button" hx-get="/api/game/events" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🎁</span><small>Sự kiện</small><b>3</b></button>
+              hx-on:click="openDrawer('popup')"><span>🎁</span><small data-i18n="nav.events">Sự kiện</small><b>3</b></button>
             <button class="quick-action" type="button" hx-get="/api/game/quests" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>📜</span><small>Nhiệm vụ</small></button>
+              hx-on:click="openDrawer('popup')"><span>📜</span><small data-i18n="nav.quests">Nhiệm vụ</small></button>
             <button class="quick-action" type="button" hx-get="/api/shop" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🏪</span><small>Cửa hàng</small></button>
+              hx-on:click="openDrawer('popup')"><span>🏪</span><small data-i18n="nav.shop">Cửa hàng</small></button>
             <button class="quick-action" type="button" hx-get="/api/game/inventory" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🎒</span><small>Kho đồ</small></button>
+              hx-on:click="openDrawer('popup')"><span>🎒</span><small data-i18n="nav.inventory">Kho đồ</small></button>
             <button class="quick-action" type="button" hx-get="/api/game/map" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🗺️</span><small>Bản đồ</small></button>
-            <button class="menu-button" type="button" aria-expanded="false"
-              onclick="toggleQuickMenu(this)"><span>☰</span><i></i></button>
+              hx-on:click="openDrawer('popup')"><span>🗺️</span><small data-i18n="nav.map">Bản đồ</small></button>
+            <button class="menu-button" type="button" aria-label="Mở menu" aria-expanded="false"
+              data-i18n-aria-label="nav.openMenu"
+              onclick="toggleQuickMenu(this)"><span class="menu-icon" aria-hidden="true"></span><i></i></button>
           </nav>
         </header>
 
         <div id="drawer-backdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
-        <aside id="game-drawer" class="game-drawer" aria-label="Bảng thông tin">
+        <aside id="game-drawer" class="game-drawer" aria-label="Bảng thông tin" data-i18n-aria-label="drawer.label">
           <button class="drawer-close" type="button" onclick="closeDrawer()">×</button>
-          <div id="drawer-content"><div class="drawer-loading">Đang tải…</div></div>
+          <div id="drawer-content"><div class="drawer-loading" data-i18n="common.loading">Đang tải…</div></div>
         </aside>
       </section>
     </main>
 
     <script>
+      const savedLanguage = localStorage.getItem("sunnyfarmLanguage");
+      let currentLanguage = savedLanguage === "en" || savedLanguage === "vi"
+        ? savedLanguage
+        : (navigator.language?.toLowerCase().startsWith("en") ? "en" : "vi");
+      let messages = {};
+      document.cookie = `sunnyfarm_lang=${currentLanguage};path=/;max-age=31536000;SameSite=Lax`;
+
+      async function loadLanguage() {
+        const response = await fetch(`/locales/${currentLanguage}.json`);
+        if (!response.ok) throw new Error("Unable to load language file.");
+        messages = await response.json();
+        window.i18n = { language: currentLanguage, t: tr };
+        document.documentElement.lang = currentLanguage;
+        document.getElementById("language-select").value = currentLanguage;
+        applyTranslations();
+      }
+
+      function tr(key, values = {}) {
+        const template = messages[key] || key;
+        return Object.entries(values).reduce(
+          (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+          template
+        );
+      }
+
+      function applyTranslations() {
+        document.querySelectorAll("[data-i18n]").forEach((element) => {
+          const values = element.dataset.i18nLevel
+            ? { level: element.dataset.i18nLevel }
+            : {};
+          element.textContent = tr(element.dataset.i18n, values);
+        });
+        for (const attribute of ["placeholder", "title", "aria-label", "alt"]) {
+          document.querySelectorAll(`[data-i18n-${attribute}]`).forEach((element) => {
+            element.setAttribute(attribute, tr(element.getAttribute(`data-i18n-${attribute}`)));
+          });
+        }
+      }
+
+      function renderPlayerProgress({ level = 1, xp = 0 } = {}) {
+        const safeLevel = Math.max(1, Number(level) || 1);
+        const safeXp = Math.max(0, Math.min(100, Number(xp) || 0));
+        const levelText = document.getElementById("player-level");
+        levelText.dataset.i18nLevel = String(safeLevel);
+        levelText.textContent = tr("common.level", { level: safeLevel });
+        document.getElementById("player-xp-fill").style.width = `${safeXp}%`;
+        document.getElementById("player-xp-track").setAttribute(
+          "aria-label",
+          `XP ${safeXp}/100`
+        );
+      }
+
+      async function refreshPlayerProgress() {
+        const response = await fetch("/api/game/state");
+        if (!response.ok) return;
+        const state = await response.json();
+        renderPlayerProgress(state.player);
+      }
+
+      document.body.addEventListener("farm:progress", (event) => {
+        renderPlayerProgress(event.detail);
+      });
+
+      function changeLanguage(language) {
+        if (!["vi", "en"].includes(language)) return;
+        localStorage.setItem("sunnyfarmLanguage", language);
+        document.cookie = `sunnyfarm_lang=${language};path=/;max-age=31536000;SameSite=Lax`;
+        location.reload();
+      }
+
+      let currentPlayerName = "";
+      let gameHasStarted = false;
+      let onlineSocket = null;
+      let onlineRoomId = null;
+      const onlinePlayerKey = sessionStorage.getItem("onlinePlayerKey")
+        || crypto.randomUUID();
+      sessionStorage.setItem("onlinePlayerKey", onlinePlayerKey);
+      let resolveFarmGame;
+      window.farmGameReady = new Promise((resolve) => {
+        resolveFarmGame = resolve;
+      });
+
+      async function initializeStartScreen() {
+        try {
+          const response = await fetch("/api/auth/profile");
+          if (!response.ok) throw new Error(tr("game.loadFailed"));
+          const profile = await response.json();
+          currentPlayerName = profile.name || tr("common.farmer");
+          document.getElementById("player-display").textContent = currentPlayerName;
+          document.getElementById("start-message").textContent =
+            tr("start.ready", { name: currentPlayerName });
+          document.getElementById("continue-button").disabled = false;
+          document.getElementById("restart-button").disabled = false;
+          document.getElementById("online-button").disabled = false;
+        } catch (error) {
+          document.getElementById("start-message").textContent =
+            tr("start.connectionError");
+        }
+      }
+
+      function enterGame(name) {
+        if (gameHasStarted) return;
+        gameHasStarted = true;
+        document.getElementById("player-display").textContent = name;
+        document.getElementById("start-screen").classList.add("leaving");
+        setTimeout(() => document.getElementById("start-screen").remove(), 260);
+        resolveFarmGame();
+      }
+
+      function continueGame() {
+        enterGame(currentPlayerName);
+      }
+
+      function showNewGameForm() {
+        document.getElementById("start-choices").hidden = true;
+        document.getElementById("new-game-form").hidden = false;
+        document.getElementById("new-player-name").focus();
+      }
+
+      function hideNewGameForm() {
+        document.getElementById("new-game-form").hidden = true;
+        document.getElementById("start-choices").hidden = false;
+        document.getElementById("start-error").textContent = "";
+      }
+
+      function showOnlineMenu() {
+        document.getElementById("start-choices").hidden = true;
+        document.getElementById("online-menu").hidden = false;
+        document.getElementById("online-error").textContent = "";
+        ensureOnlineSocket();
+      }
+
+      function hideOnlineMenu() {
+        document.getElementById("online-menu").hidden = true;
+        document.getElementById("start-choices").hidden = false;
+        document.getElementById("online-error").textContent = "";
+      }
+
+      function ensureOnlineSocket() {
+        if (onlineSocket) return onlineSocket;
+        onlineSocket = io();
+        onlineSocket.on("online:room-state", renderOnlineRoom);
+        onlineSocket.on("disconnect", () => {
+          if (onlineRoomId) {
+            document.getElementById("room-status").textContent =
+              tr("online.disconnected");
+          }
+        });
+        onlineSocket.on("connect", () => {
+          if (onlineRoomId && !onlineSocket.recovered) {
+            onlineSocket.emit("online:join", {
+              roomId: onlineRoomId,
+              name: currentPlayerName,
+              playerKey: onlinePlayerKey,
+              language: currentLanguage
+            }, handleOnlineRoomResult);
+          } else if (onlineRoomId) {
+            document.getElementById("room-status").textContent = tr("online.reconnected");
+          }
+        });
+        return onlineSocket;
+      }
+
+      function createOnlineRoom() {
+        const button = document.getElementById("create-room-button");
+        button.disabled = true;
+        document.getElementById("online-error").textContent = "";
+        ensureOnlineSocket().emit(
+          "online:create",
+          { name: currentPlayerName, playerKey: onlinePlayerKey, language: currentLanguage },
+          (result) => {
+            button.disabled = false;
+            handleOnlineRoomResult(result);
+          }
+        );
+      }
+
+      function joinOnlineRoom(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector("button");
+        const roomId = new FormData(form).get("roomId").trim().toUpperCase();
+        button.disabled = true;
+        document.getElementById("online-error").textContent = "";
+        ensureOnlineSocket().emit(
+          "online:join",
+          { roomId, name: currentPlayerName, playerKey: onlinePlayerKey, language: currentLanguage },
+          (result) => {
+            button.disabled = false;
+            handleOnlineRoomResult(result);
+          }
+        );
+      }
+
+      function handleOnlineRoomResult(result) {
+        if (!result?.ok) {
+          document.getElementById("online-error").textContent =
+            result?.error || tr("online.connectError");
+          return;
+        }
+        document.getElementById("online-menu").hidden = true;
+        document.getElementById("online-room").hidden = false;
+        renderOnlineRoom(result.room);
+      }
+
+      function renderOnlineRoom(room) {
+        onlineRoomId = room.id;
+        document.getElementById("room-code").textContent = room.id;
+        document.getElementById("room-status").textContent =
+          tr("online.playerCount", {
+            current: room.players.length,
+            max: room.maxPlayers
+          });
+        const list = document.getElementById("online-player-list");
+        list.replaceChildren(...room.players.map((player, index) => {
+          const row = document.createElement("div");
+          const name = document.createElement("strong");
+          const status = document.createElement("span");
+          name.textContent = `${index + 1}. ${player.name}`;
+          status.textContent = player.isHost ? tr("online.host") : tr("online.joined");
+          row.append(name, status);
+          return row;
+        }));
+      }
+
+      async function copyRoomCode() {
+        if (!onlineRoomId) return;
+        await navigator.clipboard?.writeText(onlineRoomId);
+        document.getElementById("room-status").textContent = tr("online.copied");
+      }
+
+      function leaveOnlineRoom() {
+        if (onlineSocket?.connected) onlineSocket.emit("online:leave");
+        onlineRoomId = null;
+        document.getElementById("online-room").hidden = true;
+        document.getElementById("online-menu").hidden = false;
+      }
+
+      async function startNewGame(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submitButton = form.querySelector('[type="submit"]');
+        const errorBox = document.getElementById("start-error");
+        const name = new FormData(form).get("name").trim();
+        if (!name) return;
+
+        submitButton.disabled = true;
+        submitButton.textContent = tr("restart.creating");
+        errorBox.textContent = "";
+
+        try {
+          const response = await fetch("/api/auth/new-game", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || tr("restart.failed"));
+
+          currentPlayerName = result.name;
+          document.body.dispatchEvent(new CustomEvent("farm:changed"));
+          enterGame(result.name);
+        } catch (error) {
+          errorBox.textContent = error.message;
+          submitButton.disabled = false;
+          submitButton.textContent = tr("restart.confirm");
+        }
+      }
+
       function openDrawer(mode) {
         const drawer = document.getElementById("game-drawer");
         drawer.classList.toggle("center-popup", mode === "popup");
         drawer.classList.add("open");
         document.getElementById("drawer-backdrop").classList.add("open");
+        setGameInputEnabled(false);
         closeQuickMenu();
       }
       function closeDrawer() {
         document.getElementById("game-drawer").classList.remove("open");
         document.getElementById("drawer-backdrop").classList.remove("open");
+        setGameInputEnabled(true);
       }
-      function toggleProfile() {
-        document.getElementById("profile-editor").classList.toggle("open");
+      function setGameInputEnabled(enabled) {
+        window.farmGame?.scene.getScenes(true).forEach((scene) => {
+          if (scene.input) scene.input.enabled = enabled;
+        });
       }
       function toggleQuickMenu(button) {
         const menu = button.closest(".top-actions");
         const isOpen = menu.classList.toggle("open");
         button.setAttribute("aria-expanded", String(isOpen));
+        button.setAttribute("aria-label", isOpen ? tr("nav.closeMenu") : tr("nav.openMenu"));
       }
       function closeQuickMenu() {
         const menu = document.querySelector(".top-actions");
         const button = menu.querySelector(".menu-button");
         menu.classList.remove("open");
         button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-label", tr("nav.openMenu"));
       }
       function selectShopItem(button) {
         document.querySelectorAll(".shop-product").forEach((item) =>
@@ -100,6 +449,7 @@
         const purchase = document.getElementById("shop-purchase");
         purchase.hidden = false;
         purchase.dataset.unitPrice = button.dataset.price;
+        document.getElementById("shop-item").value = button.dataset.item;
         document.getElementById("selected-product-name").textContent = button.dataset.name;
         document.getElementById("shop-quantity").value = 1;
         updateShopTotal();
@@ -115,13 +465,58 @@
         const quantity = Math.max(1, Math.min(99, Number(input.value || 1)));
         input.value = quantity;
         document.getElementById("shop-total").textContent =
-          `${quantity * Number(purchase.dataset.unitPrice)} xu`;
+          tr("shop.coins", { amount: quantity * Number(purchase.dataset.unitPrice) });
       }
-      function updatePlayerName(form) {
-        document.getElementById("player-display").textContent =
-          new FormData(form).get("name") || "SunnyFarm";
-        form.classList.remove("open");
+
+      function selectInventoryProduce(button) {
+        document.querySelectorAll(".inventory-slot.sellable").forEach((slot) =>
+          slot.classList.remove("selected")
+        );
+        button.classList.add("selected");
+        const sale = document.getElementById("inventory-sale");
+        const maxQuantity = Math.max(1, Number(button.dataset.quantity) || 1);
+        sale.hidden = false;
+        sale.dataset.unitPrice = button.dataset.price;
+        sale.dataset.maxQuantity = String(maxQuantity);
+        document.getElementById("inventory-sale-item").value = button.dataset.item;
+        document.getElementById("inventory-sale-name").textContent = button.dataset.name;
+        const input = document.getElementById("inventory-sale-quantity");
+        input.max = String(maxQuantity);
+        input.value = 1;
+        document.getElementById("inventory-sale-result").textContent = "";
+        updateInventorySaleTotal();
       }
+
+      function changeInventorySaleQuantity(change) {
+        const input = document.getElementById("inventory-sale-quantity");
+        input.value = Number(input.value || 1) + change;
+        updateInventorySaleTotal();
+      }
+
+      function updateInventorySaleTotal() {
+        const sale = document.getElementById("inventory-sale");
+        const input = document.getElementById("inventory-sale-quantity");
+        const maxQuantity = Number(sale.dataset.maxQuantity) || 1;
+        const quantity = Math.max(1, Math.min(maxQuantity, Number(input.value || 1)));
+        input.value = quantity;
+        document.getElementById("inventory-sale-total").textContent =
+          tr("shop.coins", { amount: quantity * Number(sale.dataset.unitPrice) });
+      }
+
+      async function initializeApp() {
+        try {
+          await loadLanguage();
+          await initializeStartScreen();
+          await refreshPlayerProgress();
+        } catch {
+          document.getElementById("start-message").textContent =
+            currentLanguage === "en"
+              ? "Unable to load the game language."
+              : "Không thể tải ngôn ngữ trò chơi.";
+        }
+      }
+
+      initializeApp();
     </script>
     <script type="module" src="/game/main.js"></script>
   </body>

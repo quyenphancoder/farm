@@ -6,7 +6,8 @@ export default class PreloadScene extends Phaser.Scene {
   preload() {
     this.load.image("farm-background", "/assets/tiles/farm-background-flat-v3.png");
     this.load.image("plot", "/assets/tiles/soil.png");
-    this.load.image("lock-flag", "/assets/tiles/lock-flag.png");
+    this.load.image("carrot", "/assets/crops/carrot.png");
+    this.load.image("corn", "/assets/crops/corn.png");
     this.loadFarmerSprites();
   }
 
@@ -14,21 +15,9 @@ export default class PreloadScene extends Phaser.Scene {
     this.createFarmerAvatar();
     this.setFarmerTextureFilters();
     this.textures.get("plot").setFilter(Phaser.Textures.FilterMode.LINEAR);
-    this.textures.get("lock-flag").setFilter(Phaser.Textures.FilterMode.LINEAR);
     this.textures.get("farm-background").setFilter(Phaser.Textures.FilterMode.LINEAR);
-    const graphics = this.make.graphics({ add: false });
-
-    // A friendly carrot crop icon in the same illustrated palette.
-    graphics.fillStyle(0x17351f, .25).fillEllipse(22, 52, 28, 7);
-    graphics.fillStyle(0x4d9f3c).fillEllipse(17, 14, 13, 25);
-    graphics.fillStyle(0x63bd4d).fillEllipse(27, 13, 13, 25);
-    graphics.fillStyle(0x2f7d35).fillEllipse(22, 10, 10, 23);
-    graphics.fillStyle(0xf28c28).fillTriangle(10, 20, 34, 20, 22, 54);
-    graphics.lineStyle(2, 0xffbc58, .9);
-    graphics.lineBetween(14, 28, 27, 31);
-    graphics.lineBetween(18, 38, 28, 40);
-    graphics.generateTexture("carrot", 44, 58);
-    graphics.destroy();
+    this.textures.get("carrot").setFilter(Phaser.Textures.FilterMode.LINEAR);
+    this.textures.get("corn").setFilter(Phaser.Textures.FilterMode.LINEAR);
 
     this.scene.start("FarmScene");
   }

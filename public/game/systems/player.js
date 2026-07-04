@@ -1,8 +1,8 @@
 export default class Player {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.baseScaleX = .36;
-    this.baseScaleY = .31;
+    this.baseScaleX = .32;
+    this.baseScaleY = .30;
     this.lastDirection = "down";
     this.actionUntil = 0;
     this.sprite = scene.physics.add.sprite(x, y, "farmer-down-0");
@@ -10,11 +10,11 @@ export default class Player {
       .setOrigin(.55, .91)
       .setScale(this.baseScaleX, this.baseScaleY)
       .setCollideWorldBounds(true)
-      .setDepth(10);
+      .setDepth(20);
     this.shadowOffsetX = this.sprite.originX - .5;
     this.sprite.body.setSize(54, 34).setOffset(42, 176);
-    this.shadow = scene.add.ellipse(x, y + 5, 34, 12, 0x102015, .28)
-      .setDepth(9);
+    this.shadow = scene.add.ellipse(x, y + 5, 34, 12, 0x102015, .4)
+      .setDepth(19);
     this.createAnimations();
 
     this.cursors = scene.input.keyboard.createCursorKeys();
@@ -25,7 +25,7 @@ export default class Player {
 
     this.marker = scene.add.circle(x, y, 13, 0xffe787, .22)
       .setStrokeStyle(3, 0xfff2a8, .9)
-      .setDepth(9)
+      .setDepth(19)
       .setVisible(false);
     scene.tweens.add({
       targets: this.marker,
@@ -38,7 +38,12 @@ export default class Player {
 
     scene.input.mouse.disableContextMenu();
     scene.input.on("pointerdown", (pointer) => {
-      if (pointer.rightButtonDown()) this.moveTo(pointer.worldX, pointer.worldY);
+      const isTouch = pointer.wasTouch
+        || pointer.event?.pointerType === "touch"
+        || pointer.event?.type?.startsWith("touch");
+      if (pointer.rightButtonDown() || isTouch) {
+        this.moveTo(pointer.worldX, pointer.worldY);
+      }
     });
   }
 
@@ -65,6 +70,8 @@ export default class Player {
       return;
     }
     if (this.actionUntil) {
+      this.waterCollectionTween?.stop();
+      this.waterCollectionTween = null;
       this.actionUntil = 0;
       this.sprite.setScale(this.baseScaleX, this.baseScaleY);
       this.setIdleFrame();
@@ -167,6 +174,37 @@ export default class Player {
       repeat: 1
     });
     this.actionUntil = this.scene.time.now + duration;
+  }
+
+  startWaterCollection(duration, targetX, targetY) {
+    this.cancelMove();
+    this.sprite.setVelocity(0);
+    this.lastDirection = targetX < this.sprite.x ? "left" : "right";
+    if (Math.abs(targetY - this.sprite.y) > Math.abs(targetX - this.sprite.x)) {
+      this.lastDirection = targetY < this.sprite.y ? "up" : "down";
+    }
+    this.setIdleFrame();
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.waterCollectionTween = this.scene.tweens.add({
+      targets: this.sprite,
+      scaleX: this.baseScaleX * 1.035,
+      scaleY: this.baseScaleY * .965,
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+    this.actionUntil = this.scene.time.now + Math.max(0, duration);
+  }
+
+  stopWaterCollection() {
+    this.waterCollectionTween?.stop();
+    this.waterCollectionTween = null;
+    this.actionUntil = 0;
+    this.sprite.setVelocity(0);
+    this.sprite.setScale(this.baseScaleX, this.baseScaleY);
+    this.setIdleFrame();
+    this.updateShadow();
   }
 
   moveTo(x, y) {

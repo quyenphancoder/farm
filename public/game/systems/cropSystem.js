@@ -1,30 +1,32 @@
 export default class CropSystem {
-  constructor(scene, inventory, quests) {
+  constructor(scene, inventory) {
     this.scene = scene;
     this.inventory = inventory;
-    this.quests = quests;
+    this.t = (key, values) => window.i18n?.t(key, values) || key;
     this.plots = [];
     this.lockedPlots = [];
     this.savedPlots = new Map();
     this.unlockedPlots = new Set();
     this.landUnlockCost = 50;
+    this.cropGrowthMs = 10000;
     this.layout = {
-      rows: 4,
-      cols: 5,
-      plotWidth: 62,
-      plotHeight: 55,
-      plotSpacingX: 70,
-      plotSpacingY: 58,
-      gridStartX: 480 - 70 * 2,
-      gridStartY: 256
+      rows: 5,
+      cols: 8,
+      plotWidth: 48,
+      plotHeight: 40,
+      plotSpacingX: 50,
+      plotSpacingY: 42,
+      gridStartX: 480 + (scene.mapOffsetX || 0) - 50 * 3.5,
+      gridStartY: 255 + (scene.mapOffsetY || 0)
     };
     this.seedPopup = null;
     this.confirmPopup = null;
     this.inventoryCounts = new Map();
+    this.currentLevel = 1;
     this.seedOptions = [
-      { seed: "carrot_seed", crop: "carrot", name: "Hạt cà rốt", icon: "🌱", cropName: "cà rốt" },
-      { seed: "corn_seed", crop: "corn", name: "Hạt ngô", icon: "🌽", cropName: "ngô", locked: true },
-      { seed: "tomato_seed", crop: "tomato", name: "Hạt cà chua", icon: "🍅", cropName: "cà chua", locked: true }
+      { seed: "carrot_seed", crop: "carrot", name: this.t("item.carrotSeed"), icon: "🌱", cropName: this.t("item.carrotLower") },
+      { seed: "corn_seed", crop: "corn", name: this.t("item.cornSeed"), icon: "🌽", cropName: this.t("item.cornLower"), unlockLevel: 2, locked: true },
+      { seed: "tomato_seed", crop: "tomato", name: this.t("item.tomatoSeed"), icon: "🍅", cropName: this.t("item.tomatoLower"), unlockLevel: 5, locked: true }
     ];
   }
 
@@ -33,6 +35,7 @@ export default class CropSystem {
     this.savedPlots = new Map(state.plots.map((plot) => [plot.plot_id, plot]));
     this.unlockedPlots = new Set(state.unlockedPlots || [0, 1, 2, 3, 4]);
     this.inventoryCounts = new Map(state.inventory.map((item) => [item.item, item.quantity]));
+    this.updateSeedLocks(state.player?.level);
 
     for (let row = 0; row < this.layout.rows; row += 1) {
       for (let col = 0; col < this.layout.cols; col += 1) {
@@ -44,6 +47,7 @@ export default class CropSystem {
         }
       }
     }
+    return state;
   }
 
   addPlotRow(row) {
@@ -59,18 +63,35 @@ export default class CropSystem {
       .setDisplaySize(plotWidth, plotHeight)
       .setDepth(3 + row * .01)
       .setInteractive({ useHandCursor: true });
-    const plot = { id, image, crop: null, plantedAt: null, label: null, busy: false };
+    const plot = {
+      id,
+      image,
+      crop: null,
+      plantedAt: null,
+      wateredAt: null,
+      treatedAt: null,
+      label: null,
+      busy: false
+    };
 
     image.on("pointerover", () => image.setDisplaySize(plotWidth + 4, plotHeight + 4).setTint(0xfff0b8));
     image.on("pointerout", () => image.setDisplaySize(plotWidth, plotHeight).clearTint());
     image.on("pointerdown", (pointer) => {
-      if (pointer.leftButtonDown()) this.interact(plot);
+      if (!pointer.leftButtonDown()) return;
+      pointer.event.stopPropagation();
+      this.interact(plot);
     });
 
     this.plots.push(plot);
     if (this.savedPlots.has(id)) {
       const savedPlot = this.savedPlots.get(id);
-      this.showCrop(plot, savedPlot.planted_at, savedPlot.crop);
+      this.showCrop(
+        plot,
+        savedPlot.planted_at,
+        savedPlot.crop,
+        savedPlot.watered_at,
+        savedPlot.treated_at
+      );
     }
   }
 
@@ -85,22 +106,26 @@ export default class CropSystem {
       .setTint(0x5c4934)
       .setAlpha(.82)
       .setInteractive({ useHandCursor: true });
-    const flag = this.scene.add.image(x + 3, y - 8, "lock-flag")
-      .setDisplaySize(34, 43)
+    const lockIcon = this.scene.add.text(x, y - 2, "🔒", {
+      fontFamily: "Arial, sans-serif",
+      fontSize: "20px"
+    })
+      .setOrigin(.5)
       .setDepth(12 + row * .01)
-      .setTint(0xd8e0ff)
+      .setShadow(0, 2, "#00000099", 2)
       .setInteractive({ useHandCursor: true });
 
     const confirm = (pointer) => {
+      if (!pointer.leftButtonDown()) return;
       pointer.event.stopPropagation();
       this.showUnlockConfirm(plotId, row, col);
     };
     soil.on("pointerover", () => soil.setTint(0x6c543c).setAlpha(.9));
     soil.on("pointerout", () => soil.setTint(0x5c4934).setAlpha(.82));
     soil.on("pointerdown", confirm);
-    flag.on("pointerdown", confirm);
+    lockIcon.on("pointerdown", confirm);
 
-    this.lockedPlots[plotId] = { soil, flag };
+    this.lockedPlots[plotId] = { soil, lockIcon };
   }
 
   async interact(plot) {
@@ -109,7 +134,7 @@ export default class CropSystem {
     const distance = Phaser.Math.Distance.Between(
       this.scene.player.sprite.x, this.scene.player.sprite.y, plot.image.x, plot.image.y
     );
-    if (distance > 165) return this.toast("Hãy lại gần ô đất nhé!");
+    if (distance > 165) return this.toast(this.t("plot.comeCloser"));
 
     plot.busy = true;
     try {
@@ -117,15 +142,54 @@ export default class CropSystem {
         try {
           await this.refreshInventoryCounts();
         } catch {
-          this.toast("Không thể tải hạt giống.");
+          this.toast(this.t("plot.seedLoadFailed"));
           return;
         }
         this.showSeedPopup(plot);
         return;
       }
 
-      if (Date.now() - plot.plantedAt < 10000) {
-        this.toast(`${plot.cropName || "Cây trồng"} vẫn đang lớn.`);
+      if (!plot.wateredAt && Date.now() - plot.plantedAt < this.cropGrowthMs) {
+        this.toast(this.t("plot.growing", { crop: plot.cropName || this.t("plot.crop") }));
+        return;
+      }
+
+      if (!plot.wateredAt) {
+        const result = await this.inventory.request(`/api/game/plots/${plot.id}/water`);
+        if (result.ok) {
+          plot.wateredAt = Number(result.wateredAt);
+          const waterCount = this.inventoryCounts.get("water") || 0;
+          this.inventoryCounts.set("water", Math.max(0, waterCount - 1));
+          this.scene.player.playAction(plot.image.x, plot.image.y);
+          this.changed();
+          this.toast(this.t("plot.watered"), "success");
+        } else {
+          this.toast(result.error);
+        }
+        return;
+      }
+
+      if (!plot.treatedAt) {
+        if (Date.now() - plot.wateredAt < this.cropGrowthMs) {
+          this.toast(this.t("plot.growing", { crop: plot.cropName || this.t("plot.crop") }));
+          return;
+        }
+        const result = await this.inventory.request(`/api/game/plots/${plot.id}/pesticide`);
+        if (result.ok) {
+          plot.treatedAt = Number(result.treatedAt);
+          const pesticideCount = this.inventoryCounts.get("pesticide") || 0;
+          this.inventoryCounts.set("pesticide", Math.max(0, pesticideCount - 1));
+          this.scene.player.playAction(plot.image.x, plot.image.y);
+          this.changed();
+          this.toast(this.t("plot.treated"), "success");
+        } else {
+          this.toast(result.error);
+        }
+        return;
+      }
+
+      if (Date.now() - plot.treatedAt < this.cropGrowthMs) {
+        this.toast(this.t("plot.growing", { crop: plot.cropName || this.t("plot.crop") }));
         return;
       }
 
@@ -135,12 +199,14 @@ export default class CropSystem {
         const harvestedCrop = plot.crop;
         const harvestedLabel = plot.label;
 
-        const cropName = plot.cropName || "cây trồng";
+        const cropName = plot.cropName || this.t("plot.crop");
         plot.crop = null;
         plot.cropType = null;
         plot.cropName = null;
         plot.label = null;
         plot.plantedAt = null;
+        plot.wateredAt = null;
+        plot.treatedAt = null;
         harvestedLabel?.destroy();
         this.scene.tweens.killTweensOf(harvestedCrop);
         this.scene.tweens.add({
@@ -152,7 +218,10 @@ export default class CropSystem {
           duration: 260,
           onComplete: () => harvestedCrop.destroy()
         });
-        this.quests.recordHarvest();
+        document.body.dispatchEvent(new CustomEvent("farm:progress", {
+          detail: { level: result.level, xp: result.xp }
+        }));
+        this.updateSeedLocks(result.level);
         this.changed();
         this.toast(`+1 ${cropName}`, "success");
       } else {
@@ -188,6 +257,14 @@ export default class CropSystem {
   async refreshInventoryCounts() {
     const state = await this.inventory.fetchState();
     this.inventoryCounts = new Map(state.inventory.map((item) => [item.item, item.quantity]));
+    this.updateSeedLocks(state.player?.level);
+  }
+
+  updateSeedLocks(level = 1) {
+    this.currentLevel = Math.max(1, Number(level) || 1);
+    for (const option of this.seedOptions) {
+      option.locked = Boolean(option.unlockLevel && this.currentLevel < option.unlockLevel);
+    }
   }
 
   showUnlockConfirm(plotId, row, col) {
@@ -207,21 +284,21 @@ export default class CropSystem {
     graphics.fillStyle(0x101c16, 1).fillRoundedRect(-width / 2, -height / 2, width, height, 14);
     graphics.lineStyle(3, 0xffe08a, .95).strokeRoundedRect(-width / 2, -height / 2, width, height, 14);
     popup.add([blocker, graphics]);
-    popup.add(this.scene.add.text(0, -33, "Mua ô đất này?", {
+    popup.add(this.scene.add.text(0, -33, this.t("plot.buyQuestion"), {
       fontFamily: "Nunito, sans-serif",
       fontSize: "15px",
       fontStyle: "bold",
       color: "#fff1b8"
     }).setOrigin(.5));
-    popup.add(this.scene.add.text(0, -8, `Giá: 💎 ${this.landUnlockCost}`, {
+    popup.add(this.scene.add.text(0, -8, this.t("plot.price", { cost: this.landUnlockCost }), {
       fontFamily: "Nunito, sans-serif",
       fontSize: "13px",
       fontStyle: "bold",
       color: "#ffffff"
     }).setOrigin(.5));
 
-    const cancel = this.createConfirmButton(-50, 31, "Hủy", 0x38453b, () => this.closeConfirmPopup());
-    const buy = this.createConfirmButton(52, 31, "Mua", 0x4f7b3f, () => this.unlockLand(plotId, row, col));
+    const cancel = this.createConfirmButton(-50, 31, this.t("plot.cancel"), 0x38453b, () => this.closeConfirmPopup());
+    const buy = this.createConfirmButton(52, 31, this.t("plot.buy"), 0x4f7b3f, () => this.unlockLand(plotId, row, col));
     popup.add([cancel, buy]);
     this.confirmPopup = popup;
   }
@@ -263,11 +340,11 @@ export default class CropSystem {
 
     this.unlockedPlots.add(plotId);
     this.lockedPlots[plotId]?.soil.destroy();
-    this.lockedPlots[plotId]?.flag.destroy();
+    this.lockedPlots[plotId]?.lockIcon.destroy();
     this.lockedPlots[plotId] = null;
     this.addPlot(row, col);
     this.changed();
-    this.toast(`Đã mua ô đất -${this.landUnlockCost} 💎`, "success");
+    this.toast(this.t("plot.bought", { cost: this.landUnlockCost }), "success");
   }
 
   showSeedPopup(plot) {
@@ -291,14 +368,15 @@ export default class CropSystem {
     graphics.fillStyle(0x101c16, 1).fillRoundedRect(-width / 2, -height / 2, width, height, 14);
     graphics.lineStyle(3, 0xffe08a, .95).strokeRoundedRect(-width / 2, -height / 2, width, height, 14);
     popup.add(graphics);
-    popup.add(this.scene.add.text(-width / 2 + 14, -height / 2 + 12, "Chọn hạt giống", {
+    const titleY = -height / 2 + 20;
+    popup.add(this.scene.add.text(-width / 2 + 14, titleY, this.t("plot.chooseSeed"), {
       fontFamily: "Nunito, sans-serif",
       fontSize: "14px",
       fontStyle: "bold",
       color: "#fff1b8"
-    }));
+    }).setOrigin(0, .5));
 
-    const closeButton = this.scene.add.text(width / 2 - 22, -height / 2 + 9, "×", {
+    const closeButton = this.scene.add.text(width / 2 - 22, titleY - 4, "×", {
       fontFamily: "Nunito, sans-serif",
       fontSize: "22px",
       fontStyle: "bold",
@@ -317,7 +395,9 @@ export default class CropSystem {
       const row = this.scene.add.rectangle(0, rowY, width - 24, 28, disabled ? 0x263229 : 0x3f6b44, 1)
         .setStrokeStyle(1, disabled ? 0x65735f : 0xd2ff87, disabled ? .45 : .95);
       const label = `${option.icon} ${option.name}`;
-      const detail = option.locked ? "Khóa" : `x${count}`;
+      const detail = option.locked
+        ? this.t("shop.level", { level: option.unlockLevel })
+        : `x${count}`;
       const nameText = this.scene.add.text(-width / 2 + 22, rowY, label, {
         fontFamily: "Nunito, sans-serif",
         fontSize: "12px",
@@ -351,42 +431,108 @@ export default class CropSystem {
     this.seedPopup = null;
   }
 
-  showCrop(plot, plantedAt, cropType = "carrot") {
+  showCrop(plot, plantedAt, cropType = "carrot", wateredAt = null, treatedAt = null) {
     const cropInfo = this.seedOptions.find((option) => option.crop === cropType)
       || { crop: cropType, cropName: cropType };
     plot.plantedAt = Number(plantedAt);
+    plot.wateredAt = wateredAt ? Number(wateredAt) : null;
+    plot.treatedAt = treatedAt ? Number(treatedAt) : null;
     plot.cropType = cropType;
     plot.cropName = cropInfo.cropName;
-    plot.crop = this.scene.add.image(plot.image.x, plot.image.y - 10, "carrot")
-      .setScale(.52)
+    const texture = this.scene.textures.exists(cropType) ? cropType : "carrot";
+    plot.crop = this.scene.add.image(plot.image.x, plot.image.y - 2, texture)
+      .setScale(.04)
       .setDepth(5)
-      .setOrigin(.5, .72);
-    plot.label = this.scene.add.text(plot.image.x, plot.image.y + 19, "", {
+      .setOrigin(.5)
+      .setInteractive({ useHandCursor: true });
+    const labelBackground = this.scene.add.graphics();
+    const labelText = this.scene.add.text(0, 0, "", {
       fontFamily: "Nunito, sans-serif",
-      fontSize: "10px",
+      fontSize: "8px",
       fontStyle: "bold",
-      color: "#fff9d8",
-      backgroundColor: "#1a3528c9",
-      padding: { x: 5, y: 2 }
-    }).setOrigin(.5).setDepth(6);
-
-    this.scene.tweens.add({
-      targets: plot.crop,
-      scaleX: .57,
-      scaleY: .57,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut"
-    });
+      color: "#fff9d8"
+    }).setOrigin(.5).setResolution(2);
+    plot.label = this.scene.add.container(
+      plot.image.x,
+      plot.image.y + 14,
+      [labelBackground, labelText]
+    )
+      .setSize(18, 18)
+      .setDepth(6)
+      .setInteractive({ useHandCursor: true });
+    plot.labelBackground = labelBackground;
+    plot.labelText = labelText;
+    plot.labelState = null;
+    const interactWithCrop = (pointer) => {
+      if (!pointer.leftButtonDown()) return;
+      pointer.event.stopPropagation();
+      this.interact(plot);
+    };
+    plot.crop.on("pointerdown", interactWithCrop);
+    plot.label.on("pointerdown", interactWithCrop);
   }
 
   update() {
     for (const plot of this.plots) {
       if (!plot.crop) continue;
-      const left = Math.max(0, 10000 - (Date.now() - plot.plantedAt));
-      plot.label.setText(left ? `${Math.ceil(left / 1000)}s` : "THU HOẠCH");
-      plot.crop.setTint(left ? 0xc1c99e : 0xffffff);
+      const now = Date.now();
+      const firstGrowth = Phaser.Math.Clamp(
+        (now - plot.plantedAt) / this.cropGrowthMs,
+        0,
+        1
+      );
+      const secondGrowth = plot.wateredAt
+        ? Phaser.Math.Clamp((now - plot.wateredAt) / this.cropGrowthMs, 0, 1)
+        : 0;
+      const finalGrowth = plot.treatedAt
+        ? Phaser.Math.Clamp((now - plot.treatedAt) / this.cropGrowthMs, 0, 1)
+        : 0;
+      const growthScale = plot.treatedAt
+        ? Phaser.Math.Linear(.12, .15, Phaser.Math.Easing.Sine.InOut(finalGrowth))
+        : (plot.wateredAt
+          ? Phaser.Math.Linear(.1, .12, Phaser.Math.Easing.Sine.InOut(secondGrowth))
+          : Phaser.Math.Linear(.04, .1, Phaser.Math.Easing.Sine.InOut(firstGrowth)));
+      plot.crop.setScale(growthScale);
+      const needsWater = !plot.wateredAt && firstGrowth === 1;
+      const needsPesticide = Boolean(plot.wateredAt) && !plot.treatedAt && secondGrowth === 1;
+      const ready = Boolean(plot.treatedAt) && finalGrowth === 1;
+      const state = ready
+        ? "ready"
+        : (needsPesticide ? "pesticide" : (needsWater ? "water" : "growing"));
+      const left = plot.treatedAt
+        ? Math.max(0, this.cropGrowthMs - (now - plot.treatedAt))
+        : (plot.wateredAt
+          ? Math.max(0, this.cropGrowthMs - (now - plot.wateredAt))
+          : Math.max(0, this.cropGrowthMs - (now - plot.plantedAt)));
+      plot.labelText.setText(
+        state === "ready"
+          ? "✓"
+          : (state === "water"
+            ? "💧"
+            : (state === "pesticide" ? "🧴" : String(Math.ceil(left / 1000))))
+      );
+      if (plot.labelState !== state) {
+        plot.labelState = state;
+        plot.label.setPosition(
+          plot.image.x + 14,
+          plot.image.y + 8
+        );
+        plot.labelText
+          .setX(state === "water" || state === "pesticide" ? 1 : 0)
+          .setOrigin(state === "water" || state === "pesticide" ? .555 : .5, .5)
+          .setFontSize(
+            state === "water" || state === "pesticide" ? "9px" : (ready ? "8px" : "6px")
+          )
+          .setColor(ready ? "#fff0a6" : "#ffffff")
+          .setStroke("#315c2f", 0);
+        plot.labelBackground
+          .clear()
+          .fillStyle(0x315c2f, .98)
+          .fillCircle(0, 0, 7)
+          .lineStyle(1, 0xe2c86f, 1)
+          .strokeCircle(0, 0, 6.5);
+      }
+      plot.crop.setTint(ready ? 0xffffff : 0xc1c99e);
     }
   }
 
@@ -394,7 +540,7 @@ export default class CropSystem {
     document.body.dispatchEvent(new CustomEvent("farm:changed"));
   }
 
-  toast(message = "Có lỗi xảy ra.", type = "error") {
+  toast(message = this.t("game.genericError"), type = "error") {
     const color = type === "success" ? "#327a3dcc" : "#74352acc";
     const text = this.scene.add.text(500, 285, message, {
       fontFamily: "Nunito, sans-serif",

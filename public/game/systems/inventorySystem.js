@@ -1,7 +1,7 @@
 export default class InventorySystem {
   async fetchState() {
     const response = await fetch("/api/game/state");
-    if (!response.ok) throw new Error("Không tải được dữ liệu nông trại.");
+    if (!response.ok) throw new Error(window.i18n?.t("game.loadFailed") || "Unable to load farm data.");
     return response.json();
   }
 
@@ -14,7 +14,7 @@ export default class InventorySystem {
       });
       return await response.json();
     } catch {
-      return { error: "Không thể kết nối máy chủ." };
+      return { error: window.i18n?.t("game.serverFailed") || "Unable to connect to the server." };
     }
   }
 }

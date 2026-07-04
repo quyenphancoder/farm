@@ -1,46 +1,64 @@
 import { Router } from "express";
 import { runTransaction } from "./transaction.js";
+import { t } from "../i18n.js";
 
 const router = Router();
 
 router.get("/", (req, res) => {
-  res.send(`
-    <section class="shop-panel">
-      <h2 class="drawer-title">🏪 Tiệm Hạt Mầm</h2>
-      <p class="drawer-subtitle">Chọn vật phẩm và số lượng muốn mua.</p>
-      <div class="shop-grid">
-        <button class="shop-product" type="button" data-name="Hạt cà rốt"
-          data-price="2" onclick="selectShopItem(this)">
-          <span class="product-icon">🌱</span>
-          <strong>Hạt cà rốt</strong>
-          <small>🪙 2 / hạt</small>
+  const text = (key, values) => t(req.language, key, values);
+  const playerLevel = req.app.locals.db
+    .prepare("SELECT level FROM players WHERE id = 1")
+    .get().level;
+  const cornProduct = playerLevel >= 2
+    ? `
+        <button class="shop-product" type="button" data-name="${text("item.cornSeed")}"
+          data-item="corn_seed" data-price="4" onclick="selectShopItem(this)">
+          <span class="product-icon">🌽</span>
+          <strong>${text("item.cornSeed")}</strong>
+          <small>${text("shop.perCornSeed")}</small>
         </button>
+      `
+    : `
         <button class="shop-product" type="button" disabled>
           <span class="product-lock">🔒</span>
           <span class="product-icon">🌽</span>
-          <strong>Hạt ngô ngọt</strong>
-          <small>Cấp 3</small>
+          <strong>${text("item.cornSeed")}</strong>
+          <small>${text("shop.level", { level: 2 })}</small>
         </button>
+      `;
+  res.send(`
+    <section class="shop-panel">
+      <h2 class="drawer-title">${text("shop.title")}</h2>
+      <p class="drawer-subtitle">${text("shop.subtitle")}</p>
+      <div class="shop-grid">
+        <button class="shop-product" type="button" data-name="${text("item.carrotSeed")}"
+          data-item="carrot_seed" data-price="2" onclick="selectShopItem(this)">
+          <span class="product-icon">🌱</span>
+          <strong>${text("item.carrotSeed")}</strong>
+          <small>${text("shop.perSeed")}</small>
+        </button>
+        <button class="shop-product" type="button" data-name="${text("item.pesticide")}"
+          data-item="pesticide" data-price="5" onclick="selectShopItem(this)">
+          <span class="product-icon">🧴</span>
+          <strong>${text("item.pesticide")}</strong>
+          <small>${text("shop.perBottle")}</small>
+        </button>
+        ${cornProduct}
         <button class="shop-product" type="button" disabled>
           <span class="product-lock">🔒</span>
           <span class="product-icon">🍅</span>
-          <strong>Hạt cà chua</strong>
-          <small>Cấp 5</small>
-        </button>
-        <button class="shop-product" type="button" disabled>
-          <span class="product-lock">🔒</span>
-          <span class="product-icon">🍓</span>
-          <strong>Hạt dâu tây</strong>
-          <small>Cấp 8</small>
+          <strong>${text("item.tomatoSeed")}</strong>
+          <small>${text("shop.level", { level: 5 })}</small>
         </button>
       </div>
 
       <form id="shop-purchase" class="shop-purchase" data-unit-price="2" hidden
-        hx-post="/api/shop/buy/carrot_seed" hx-target="#shop-result"
+        hx-post="/api/shop/buy" hx-target="#shop-result"
         hx-on::after-request="if(event.detail.successful) document.body.dispatchEvent(new CustomEvent('farm:changed'))"
         hx-on::response-error="document.getElementById('shop-result').innerHTML='<span class=&quot;shop-error&quot;>'+event.detail.xhr.responseText+'</span>'">
+        <input id="shop-item" name="item" type="hidden" value="carrot_seed" />
         <div class="purchase-summary">
-          <strong id="selected-product-name">Hạt cà rốt</strong>
+          <strong id="selected-product-name">${text("item.carrotSeed")}</strong>
           <div class="quantity-picker">
             <button type="button" onclick="changeShopQuantity(-1)">−</button>
             <input id="shop-quantity" name="quantity" type="number" min="1" max="99"
@@ -49,8 +67,8 @@ router.get("/", (req, res) => {
           </div>
         </div>
         <div class="purchase-actions">
-          <span>Tổng: <strong id="shop-total">2 xu</strong></span>
-          <button class="buy-button" type="submit">Mua ngay</button>
+          <span>${text("shop.total")} <strong id="shop-total">${text("shop.coins", { amount: 2 })}</strong></span>
+          <button class="buy-button" type="submit">${text("shop.buyNow")}</button>
         </div>
       </form>
       <div id="shop-result"></div>
@@ -58,28 +76,50 @@ router.get("/", (req, res) => {
   `);
 });
 
-router.post("/buy/carrot_seed", (req, res) => {
+router.post("/buy", (req, res) => {
   const db = req.app.locals.db;
   const quantity = Number(req.body.quantity);
+  const item = String(req.body.item || "");
+  const products = {
+    carrot_seed: { price: 2, name: t(req.language, "item.carrotSeed"), unlockLevel: 1 },
+    corn_seed: { price: 4, name: t(req.language, "item.cornSeed"), unlockLevel: 2 },
+    pesticide: { price: 5, name: t(req.language, "item.pesticide"), unlockLevel: 1 }
+  };
+  const product = products[item];
 
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
-    return res.status(400).send("Số lượng phải từ 1 đến 99.");
+    return res.status(400).send(t(req.language, "shop.invalidQuantity"));
+  }
+  if (!product) {
+    return res.status(400).send(t(req.language, "shop.invalidItem"));
   }
 
-  const totalPrice = quantity * 2;
-  const player = db.prepare("SELECT coins FROM players WHERE id = 1").get();
+  const totalPrice = quantity * product.price;
+  const player = db.prepare("SELECT coins, level FROM players WHERE id = 1").get();
+  if (player.level < product.unlockLevel) {
+    return res.status(403).send(t(req.language, "shop.levelRequired", {
+      level: product.unlockLevel
+    }));
+  }
   if (player.coins < totalPrice) {
-    return res.status(400).send(`Bạn cần ${totalPrice} xu nhưng chỉ có ${player.coins} xu.`);
+    return res.status(400).send(t(req.language, "shop.notEnoughCoins", {
+      needed: totalPrice,
+      available: player.coins
+    }));
   }
 
   runTransaction(db, () => {
     db.prepare("UPDATE players SET coins = coins - ? WHERE id = 1").run(totalPrice);
     db.prepare(`
-      INSERT INTO inventory (player_id, item, quantity) VALUES (1, 'carrot_seed', ?)
+      INSERT INTO inventory (player_id, item, quantity) VALUES (1, ?, ?)
       ON CONFLICT(player_id, item) DO UPDATE SET quantity = quantity + excluded.quantity
-    `).run(quantity);
+    `).run(item, quantity);
   });
-  res.send(`Đã mua ${quantity} hạt cà rốt với ${totalPrice} xu! 🌱`);
+  res.send(t(req.language, "shop.purchaseSuccess", {
+    quantity,
+    item: product.name,
+    price: totalPrice
+  }));
 });
 
 export default router;
