@@ -10,6 +10,7 @@ import gameRoutes from "./routes/game.js";
 import shopRoutes from "./routes/shop.js";
 import { registerOnlineRooms } from "./realtime.js";
 import { languageMiddleware } from "./i18n.js";
+import { getSocketUser, requestContext, requireAuth } from "./routes/auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,8 +24,22 @@ const io = new Server(httpServer, {
 const port = process.env.PORT || 3000;
 
 const db = new DatabaseSync(path.join(__dirname, "database.sqlite"));
+db.function("current_player_id", () => {
+  const playerId = requestContext.getStore()?.playerId;
+  if (!playerId) throw new Error("Missing authenticated player context");
+  return playerId;
+});
 db.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA foreign_keys = ON;
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
   CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL DEFAULT 'Nông dân',
@@ -34,7 +49,15 @@ db.exec(`
     xp INTEGER NOT NULL DEFAULT 0,
     unlocked_rows INTEGER NOT NULL DEFAULT 1,
     water_started_at INTEGER,
+    is_initialized INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
   CREATE TABLE IF NOT EXISTS inventory (
     player_id INTEGER NOT NULL,
@@ -65,16 +88,10 @@ ensurePlayerColumn(db, "diamonds", "INTEGER NOT NULL DEFAULT 200");
 ensurePlayerColumn(db, "unlocked_rows", "INTEGER NOT NULL DEFAULT 1");
 ensurePlayerColumn(db, "xp", "INTEGER NOT NULL DEFAULT 0");
 ensurePlayerColumn(db, "water_started_at", "INTEGER");
+ensurePlayerColumn(db, "is_initialized", "INTEGER NOT NULL DEFAULT 0");
 ensureFarmStateColumn(db, "watered_at", "INTEGER");
 ensureFarmStateColumn(db, "treated_at", "INTEGER");
 migratePlotGrid(db);
-db.prepare(
-  "INSERT OR IGNORE INTO players (id, name, coins, diamonds) VALUES (1, 'Nông dân', 500, 200)"
-).run();
-for (let plotId = 0; plotId < 8; plotId += 1) {
-  db.prepare("INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id) VALUES (1, ?)").run(plotId);
-}
-db.prepare("INSERT OR IGNORE INTO inventory (player_id, item, quantity) VALUES (1, 'carrot_seed', 5)").run();
 
 app.locals.db = db;
 app.use(express.urlencoded({ extended: true }));
@@ -89,9 +106,15 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 
 app.use("/api/auth", authRoutes);
-app.use("/api/game", gameRoutes);
-app.use("/api/shop", shopRoutes);
+app.use("/api/game", requireAuth, gameRoutes);
+app.use("/api/shop", requireAuth, shopRoutes);
 
+io.use((socket, next) => {
+  const user = getSocketUser(db, socket.request.headers.cookie);
+  if (!user) return next(new Error("Bạn cần đăng nhập."));
+  socket.data.user = user;
+  next();
+});
 registerOnlineRooms(io);
 
 httpServer.listen(port, () => {

@@ -7,7 +7,7 @@ const router = Router();
 router.get("/", (req, res) => {
   const text = (key, values) => t(req.language, key, values);
   const playerLevel = req.app.locals.db
-    .prepare("SELECT level FROM players WHERE id = 1")
+    .prepare("SELECT level FROM players WHERE id = current_player_id()")
     .get().level;
   const cornProduct = playerLevel >= 2
     ? `
@@ -95,7 +95,7 @@ router.post("/buy", (req, res) => {
   }
 
   const totalPrice = quantity * product.price;
-  const player = db.prepare("SELECT coins, level FROM players WHERE id = 1").get();
+  const player = db.prepare("SELECT coins, level FROM players WHERE id = current_player_id()").get();
   if (player.level < product.unlockLevel) {
     return res.status(403).send(t(req.language, "shop.levelRequired", {
       level: product.unlockLevel
@@ -109,9 +109,9 @@ router.post("/buy", (req, res) => {
   }
 
   runTransaction(db, () => {
-    db.prepare("UPDATE players SET coins = coins - ? WHERE id = 1").run(totalPrice);
+    db.prepare("UPDATE players SET coins = coins - ? WHERE id = current_player_id()").run(totalPrice);
     db.prepare(`
-      INSERT INTO inventory (player_id, item, quantity) VALUES (1, ?, ?)
+      INSERT INTO inventory (player_id, item, quantity) VALUES (current_player_id(), ?, ?)
       ON CONFLICT(player_id, item) DO UPDATE SET quantity = quantity + excluded.quantity
     `).run(item, quantity);
   });

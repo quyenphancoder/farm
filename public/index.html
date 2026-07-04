@@ -33,7 +33,29 @@
             <h1 id="start-title">Sunny Farm</h1>
             <p id="start-message" class="start-message" data-i18n="start.finding">Đang tìm nông trại của bạn…</p>
 
-            <div id="start-choices" class="start-choices">
+            <section id="auth-panel" class="auth-panel">
+              <div class="auth-tabs">
+                <button id="login-tab" class="active" type="button" onclick="showAuthMode('login')" data-i18n="auth.login">Đăng nhập</button>
+                <button id="register-tab" type="button" onclick="showAuthMode('register')" data-i18n="auth.register">Đăng ký</button>
+              </div>
+              <form id="auth-form" class="start-new-form" onsubmit="submitAuth(event)">
+                <label id="display-name-label" for="auth-display-name" hidden data-i18n="auth.displayName">Tên hiển thị</label>
+                <input id="auth-display-name" name="displayName" maxlength="30"
+                  autocomplete="name" placeholder="Tên nhân vật của bạn" hidden data-i18n-placeholder="auth.displayNamePlaceholder" />
+                <label for="auth-username" data-i18n="auth.username">Tên đăng nhập</label>
+                <input id="auth-username" name="username" minlength="3" maxlength="24"
+                  pattern="[A-Za-z0-9_]+" autocomplete="username" required
+                  placeholder="Ví dụ: sunny_farmer" data-i18n-placeholder="auth.usernamePlaceholder" />
+                <label for="auth-password" data-i18n="auth.password">Mật khẩu</label>
+                <input id="auth-password" name="password" type="password" minlength="6"
+                  maxlength="128" autocomplete="current-password" required
+                  placeholder="Tối thiểu 6 ký tự" data-i18n-placeholder="auth.passwordPlaceholder" />
+                <p id="auth-error" class="start-error" role="alert"></p>
+                <button id="auth-submit" class="start-confirm auth-submit" type="submit" data-i18n="auth.login">Đăng nhập</button>
+              </form>
+            </section>
+
+            <div id="start-choices" class="start-choices" hidden>
               <button id="continue-button" class="start-button continue" type="button"
                 onclick="continueGame()" disabled>
                 <span>▶</span>
@@ -49,6 +71,7 @@
                 <span>⚔</span>
                 <strong data-i18n="start.online">Đấu online</strong>
               </button>
+              <button class="logout-button" type="button" onclick="logout()" data-i18n="auth.logout">Đăng xuất</button>
             </div>
 
             <form id="new-game-form" class="start-new-form" onsubmit="startNewGame(event)" hidden>
@@ -56,7 +79,7 @@
               <input id="new-player-name" name="name" maxlength="30" required
                 autocomplete="off" placeholder="Nhập tên nhân vật…"
                 data-i18n-placeholder="restart.placeholder" />
-              <p class="reset-warning" data-i18n="restart.warning">Tiến trình cũ sẽ bị xoá vĩnh viễn.</p>
+              <p id="reset-warning" class="reset-warning" data-i18n="restart.warning">Tiến trình cũ sẽ bị xoá vĩnh viễn.</p>
               <p id="start-error" class="start-error" role="alert"></p>
               <div class="start-form-actions">
                 <button class="start-back" type="button" onclick="hideNewGameForm()" data-i18n="common.back">Quay lại</button>
@@ -69,30 +92,68 @@
               <p data-i18n="online.subtitle">Tạo phòng mới hoặc nhập mã phòng của bạn bè.</p>
               <button id="create-room-button" class="online-create" type="button"
                 onclick="createOnlineRoom()" data-i18n="online.create">＋ Tạo phòng mới</button>
-              <div class="online-divider"><span data-i18n="online.or">hoặc</span></div>
-              <form class="online-join" onsubmit="joinOnlineRoom(event)">
-                <label for="online-room-id" data-i18n="online.roomCode">Mã phòng</label>
-                <div>
-                  <input id="online-room-id" name="roomId" maxlength="6"
-                    autocomplete="off" placeholder="VD: FARM24" required
-                    data-i18n-placeholder="online.roomPlaceholder" />
-                  <button type="submit" data-i18n="online.join">Vào phòng</button>
-                </div>
-              </form>
+              <label class="room-privacy-option">
+                <input id="private-room-toggle" type="checkbox" />
+                <span>🔒 <span data-i18n="online.privateRoom">Phòng riêng — cần mã để vào</span></span>
+              </label>
+              <div class="online-list-heading">
+                <strong data-i18n="online.availableRooms">Phòng đang mở</strong>
+                <button type="button" onclick="requestOnlineRooms()" data-i18n-title="online.refresh"
+                  title="Làm mới" aria-label="Làm mới">↻</button>
+              </div>
+              <div id="online-room-list" class="online-room-browser">
+                <p data-i18n="online.loadingRooms">Đang tải danh sách phòng…</p>
+              </div>
               <p id="online-error" class="start-error" role="alert"></p>
               <button class="online-back" type="button" onclick="hideOnlineMenu()">← <span data-i18n="common.back">Quay lại</span></button>
+
+              <div id="room-code-popup" class="room-code-popup" hidden
+                onclick="if(event.target === this) closeRoomCodePopup()">
+                <form onsubmit="joinPrivateRoom(event)">
+                  <button class="room-code-popup-close" type="button"
+                    onclick="closeRoomCodePopup()" aria-label="Đóng">×</button>
+                  <h3 data-i18n="online.enterCode">Nhập mã phòng</h3>
+                  <p id="private-room-name"></p>
+                  <input id="private-room-code" name="roomCode" maxlength="6"
+                    autocomplete="off" placeholder="VD: FARM24" required
+                    data-i18n-placeholder="online.roomPlaceholder" />
+                  <p id="room-code-error" class="start-error" role="alert"></p>
+                  <button class="start-confirm" type="submit"
+                    data-i18n="online.join">Vào phòng</button>
+                </form>
+              </div>
             </section>
 
             <section id="online-room" class="online-room" hidden>
-              <p class="room-label" data-i18n="online.roomCode">Mã phòng</p>
-              <button id="room-code" class="room-code" type="button"
-                onclick="copyRoomCode()" title="Sao chép mã phòng"
-                data-i18n-title="online.copyTitle"></button>
+              <div id="room-code-block">
+                <p class="room-label" data-i18n="online.roomCode">Mã phòng</p>
+                <button id="room-code" class="room-code" type="button"
+                  onclick="copyRoomCode()" title="Sao chép mã phòng"
+                  data-i18n-title="online.copyTitle"></button>
+              </div>
+              <p id="public-room-label" class="public-room-label" hidden
+                data-i18n="online.publicRoom">Phòng công khai</p>
               <p id="room-status" class="room-status" data-i18n="online.waiting">Đang chờ người chơi…</p>
               <div id="online-player-list" class="online-player-list"></div>
-              <p class="online-coming-soon" data-i18n="online.comingSoon">Danh sách nhiệm vụ đối kháng sẽ được nối ở bước tiếp theo.</p>
+              <p class="online-battle-rule" data-i18n="online.battleRule">Người đầu tiên thu hoạch đủ 3 cây carrot sẽ chiến thắng.</p>
+              <div class="online-ready-actions">
+                <button id="ready-button" type="button" onclick="toggleOnlineReady()"
+                  data-i18n="online.ready">Sẵn sàng</button>
+                <button id="start-battle-button" type="button" onclick="startOnlineBattle()"
+                  data-i18n="online.startBattle" hidden disabled>Bắt đầu</button>
+              </div>
+              <p id="ready-hint" class="ready-hint" data-i18n="online.needPlayers">Cần ít nhất 2 người chơi.</p>
               <button class="online-back" type="button" onclick="leaveOnlineRoom()" data-i18n="online.leave">Rời phòng</button>
             </section>
+          </section>
+        </div>
+
+        <div id="battle-result" class="battle-result" hidden>
+          <section>
+            <span id="battle-result-icon"></span>
+            <h2 id="battle-result-title"></h2>
+            <p id="battle-result-message"></p>
+            <small id="battle-return-countdown"></small>
           </section>
         </div>
 
@@ -103,9 +164,14 @@
               <span class="profile-copy">
                 <strong id="player-display">SunnyFarm</strong>
                 <small id="player-level" data-i18n="common.level" data-i18n-level="1">Cấp 1</small>
-                <span id="player-xp-track" class="xp-track" aria-label="XP 0/100">
-                  <i id="player-xp-fill" style="width:0%"></i>
-                </span>
+              </span>
+              <button class="profile-menu-button" type="button" onclick="returnToMenu()"
+                title="Về menu" aria-label="Về menu"
+                data-i18n-title="nav.backToMenu" data-i18n-aria-label="nav.backToMenu">
+                <span aria-hidden="true">↩</span>
+              </button>
+              <span id="player-xp-track" class="xp-track" aria-label="XP 0/100">
+                <i id="player-xp-fill" style="width:0%"></i>
               </span>
             </div>
 
@@ -113,6 +179,11 @@
               hx-get="/api/game/hud" hx-trigger="load, farm:changed from:body">
               <span class="resource-pill" data-i18n="common.loading">Đang tải…</span>
             </div>
+
+            <section id="battle-hud" class="battle-hud" hidden>
+              <strong data-i18n="online.battleGoal">Thu hoạch 3 carrot để chiến thắng!</strong>
+              <div id="battle-progress-list"></div>
+            </section>
           </div>
 
           <nav class="top-actions" aria-label="Tính năng" data-i18n-aria-label="nav.features">
@@ -212,9 +283,13 @@
       }
 
       let currentPlayerName = "";
+      let currentUserId = "";
       let gameHasStarted = false;
+      let currentUserInitialized = false;
+      let authMode = "login";
       let onlineSocket = null;
       let onlineRoomId = null;
+      let selectedPrivateListingId = null;
       const onlinePlayerKey = sessionStorage.getItem("onlinePlayerKey")
         || crypto.randomUUID();
       sessionStorage.setItem("onlinePlayerKey", onlinePlayerKey);
@@ -225,38 +300,121 @@
 
       async function initializeStartScreen() {
         try {
-          const response = await fetch("/api/auth/profile");
-          if (!response.ok) throw new Error(tr("game.loadFailed"));
-          const profile = await response.json();
-          currentPlayerName = profile.name || tr("common.farmer");
-          document.getElementById("player-display").textContent = currentPlayerName;
-          document.getElementById("start-message").textContent =
-            tr("start.ready", { name: currentPlayerName });
-          document.getElementById("continue-button").disabled = false;
-          document.getElementById("restart-button").disabled = false;
-          document.getElementById("online-button").disabled = false;
+          const response = await fetch("/api/auth/session");
+          const session = await response.json();
+          if (!session.authenticated) {
+            document.getElementById("start-message").textContent = tr("auth.required");
+            return;
+          }
+          showAccountMenu(session.user);
         } catch (error) {
           document.getElementById("start-message").textContent =
             tr("start.connectionError");
         }
       }
 
+      function showAuthMode(mode) {
+        authMode = mode === "register" ? "register" : "login";
+        const registering = authMode === "register";
+        document.getElementById("login-tab").classList.toggle("active", !registering);
+        document.getElementById("register-tab").classList.toggle("active", registering);
+        document.getElementById("display-name-label").hidden = !registering;
+        document.getElementById("auth-display-name").hidden = !registering;
+        document.getElementById("auth-display-name").required = registering;
+        document.getElementById("auth-password").autocomplete =
+          registering ? "new-password" : "current-password";
+        document.getElementById("auth-submit").textContent =
+          tr(registering ? "auth.register" : "auth.login");
+        document.getElementById("auth-error").textContent = "";
+      }
+
+      async function submitAuth(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = document.getElementById("auth-submit");
+        const errorBox = document.getElementById("auth-error");
+        const values = Object.fromEntries(new FormData(form));
+        button.disabled = true;
+        errorBox.textContent = "";
+        try {
+          const response = await fetch(`/api/auth/${authMode}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values)
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Không thể đăng nhập.");
+          showAccountMenu(result.user);
+          document.body.dispatchEvent(new CustomEvent("farm:changed"));
+        } catch (error) {
+          errorBox.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function showAccountMenu(user) {
+        currentUserId = String(user.id);
+        currentPlayerName = user.displayName || tr("common.farmer");
+        currentUserInitialized = Boolean(user.initialized);
+        document.getElementById("auth-panel").hidden = true;
+        document.getElementById("start-choices").hidden = false;
+        document.getElementById("player-display").textContent = currentPlayerName;
+        document.getElementById("start-message").textContent =
+          currentUserInitialized
+            ? tr("start.ready", { name: currentPlayerName })
+            : tr("auth.firstFarm", { name: currentPlayerName });
+        const continueButton = document.getElementById("continue-button");
+        continueButton.hidden = !currentUserInitialized;
+        continueButton.disabled = !currentUserInitialized;
+        document.getElementById("restart-button").disabled = false;
+        document.getElementById("online-button").disabled = false;
+        document.getElementById("new-player-name").value = currentPlayerName;
+      }
+
+      async function logout() {
+        await fetch("/api/auth/logout", { method: "POST" });
+        location.reload();
+      }
+
       function enterGame(name) {
-        if (gameHasStarted) return;
-        gameHasStarted = true;
         document.getElementById("player-display").textContent = name;
-        document.getElementById("start-screen").classList.add("leaving");
-        setTimeout(() => document.getElementById("start-screen").remove(), 260);
-        resolveFarmGame();
+        const startScreen = document.getElementById("start-screen");
+        startScreen.classList.add("leaving");
+        setGameInputEnabled(true);
+        setTimeout(() => {
+          startScreen.hidden = true;
+          startScreen.classList.remove("leaving");
+          focusGameInput();
+        }, 260);
+        if (!gameHasStarted) {
+          gameHasStarted = true;
+          resolveFarmGame();
+        }
       }
 
       function continueGame() {
         enterGame(currentPlayerName);
       }
 
+      function returnToMenu() {
+        closeDrawer();
+        closeQuickMenu();
+        setGameInputEnabled(false);
+        document.getElementById("new-game-form").hidden = true;
+        document.getElementById("online-menu").hidden = true;
+        document.getElementById("online-room").hidden = true;
+        document.getElementById("auth-panel").hidden = true;
+        document.getElementById("start-choices").hidden = false;
+        const startScreen = document.getElementById("start-screen");
+        startScreen.classList.remove("leaving");
+        startScreen.hidden = false;
+      }
+
       function showNewGameForm() {
         document.getElementById("start-choices").hidden = true;
         document.getElementById("new-game-form").hidden = false;
+        document.getElementById("reset-warning").hidden = !currentUserInitialized;
         document.getElementById("new-player-name").focus();
       }
 
@@ -271,9 +429,11 @@
         document.getElementById("online-menu").hidden = false;
         document.getElementById("online-error").textContent = "";
         ensureOnlineSocket();
+        requestOnlineRooms();
       }
 
       function hideOnlineMenu() {
+        closeRoomCodePopup();
         document.getElementById("online-menu").hidden = true;
         document.getElementById("start-choices").hidden = false;
         document.getElementById("online-error").textContent = "";
@@ -283,6 +443,11 @@
         if (onlineSocket) return onlineSocket;
         onlineSocket = io();
         onlineSocket.on("online:room-state", renderOnlineRoom);
+        onlineSocket.on("online:room-list", renderOnlineRoomList);
+        onlineSocket.on("online:battle-start", beginOnlineBattle);
+        onlineSocket.on("online:battle-state", renderBattleProgress);
+        onlineSocket.on("online:battle-result", showBattleResult);
+        onlineSocket.on("online:lobby", returnToOnlineLobby);
         onlineSocket.on("disconnect", () => {
           if (onlineRoomId) {
             document.getElementById("room-status").textContent =
@@ -310,7 +475,10 @@
         document.getElementById("online-error").textContent = "";
         ensureOnlineSocket().emit(
           "online:create",
-          { name: currentPlayerName, playerKey: onlinePlayerKey, language: currentLanguage },
+          {
+            isPrivate: document.getElementById("private-room-toggle").checked,
+            language: currentLanguage
+          },
           (result) => {
             button.disabled = false;
             handleOnlineRoomResult(result);
@@ -318,18 +486,123 @@
         );
       }
 
-      function joinOnlineRoom(event) {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const button = form.querySelector("button");
-        const roomId = new FormData(form).get("roomId").trim().toUpperCase();
-        button.disabled = true;
+      function requestOnlineRooms() {
+        const socket = ensureOnlineSocket();
+        socket.emit("online:list", (result) => {
+          if (result?.ok) renderOnlineRoomList(result.rooms);
+        });
+      }
+
+      function renderOnlineRoomList(rooms = []) {
+        const list = document.getElementById("online-room-list");
+        if (!rooms.length) {
+          const empty = document.createElement("p");
+          empty.textContent = tr("online.noRooms");
+          list.replaceChildren(empty);
+          return;
+        }
+
+        list.replaceChildren(...rooms.map((room) => {
+          const row = document.createElement("div");
+          const info = document.createElement("span");
+          const name = document.createElement("strong");
+          const count = document.createElement("small");
+          const action = document.createElement("span");
+          name.textContent = tr("online.hostRoom", { name: room.hostName });
+          count.textContent = tr("online.playerCount", {
+            current: room.playerCount,
+            max: room.maxPlayers
+          });
+          info.append(name, count);
+          if (room.isPrivate) {
+            action.className = "private-room-lock";
+            action.textContent = `🔒 ${tr("online.codeRequired")}`;
+            row.classList.add("joinable-room-card");
+            row.tabIndex = 0;
+            row.setAttribute("role", "button");
+            row.onclick = () => openRoomCodePopup(room);
+            row.onkeydown = (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openRoomCodePopup(room);
+              }
+            };
+          } else {
+            const isFull = room.playerCount >= room.maxPlayers;
+            action.className = isFull ? "room-full-label" : "quick-join-label";
+            action.textContent = tr(isFull ? "online.full" : "online.quickJoin");
+            if (!isFull) {
+              row.classList.add("joinable-room-card");
+              row.tabIndex = 0;
+              row.setAttribute("role", "button");
+              row.onclick = () => joinPublicRoom(room.id, row);
+              row.onkeydown = (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  joinPublicRoom(room.id, row);
+                }
+              };
+            }
+          }
+          row.append(info, action);
+          return row;
+        }));
+      }
+
+      function joinPublicRoom(roomId, card) {
+        if (card.classList.contains("joining")) return;
+        card.classList.add("joining");
+        card.setAttribute("aria-disabled", "true");
         document.getElementById("online-error").textContent = "";
         ensureOnlineSocket().emit(
           "online:join",
-          { roomId, name: currentPlayerName, playerKey: onlinePlayerKey, language: currentLanguage },
+          { roomId, language: currentLanguage },
+          (result) => {
+            card.classList.remove("joining");
+            card.removeAttribute("aria-disabled");
+            handleOnlineRoomResult(result);
+          }
+        );
+      }
+
+      function openRoomCodePopup(room) {
+        selectedPrivateListingId = room.listingId;
+        document.getElementById("private-room-name").textContent =
+          tr("online.hostRoom", { name: room.hostName });
+        document.getElementById("room-code-error").textContent = "";
+        document.getElementById("private-room-code").value = "";
+        document.getElementById("room-code-popup").hidden = false;
+        document.getElementById("private-room-code").focus();
+      }
+
+      function closeRoomCodePopup() {
+        selectedPrivateListingId = null;
+        document.getElementById("room-code-popup").hidden = true;
+        document.getElementById("room-code-error").textContent = "";
+      }
+
+      function joinPrivateRoom(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('[type="submit"]');
+        const roomCode = new FormData(form).get("roomCode").trim().toUpperCase();
+        button.disabled = true;
+        document.getElementById("room-code-error").textContent = "";
+        ensureOnlineSocket().emit(
+          "online:join",
+          {
+            listingId: selectedPrivateListingId,
+            roomCode,
+            language: currentLanguage
+          },
           (result) => {
             button.disabled = false;
+            if (!result?.ok) {
+              document.getElementById("room-code-error").textContent =
+                result?.error || tr("online.connectError");
+              return;
+            }
+            closeRoomCodePopup();
             handleOnlineRoomResult(result);
           }
         );
@@ -349,6 +622,8 @@
       function renderOnlineRoom(room) {
         onlineRoomId = room.id;
         document.getElementById("room-code").textContent = room.id;
+        document.getElementById("room-code-block").hidden = !room.isPrivate;
+        document.getElementById("public-room-label").hidden = room.isPrivate;
         document.getElementById("room-status").textContent =
           tr("online.playerCount", {
             current: room.players.length,
@@ -361,10 +636,143 @@
           const status = document.createElement("span");
           name.textContent = `${index + 1}. ${player.name}`;
           status.textContent = player.isHost ? tr("online.host") : tr("online.joined");
+          if (room.phase === "lobby") {
+            status.textContent += ` · ${tr(player.isReady ? "online.readyStatus" : "online.notReadyStatus")}`;
+          } else {
+            status.textContent += ` · 🥕 ${player.progress || 0}/3`;
+          }
           row.append(name, status);
           return row;
         }));
+
+        const me = room.players.find((player) => String(player.id) === currentUserId);
+        const readyButton = document.getElementById("ready-button");
+        readyButton.dataset.ready = String(Boolean(me?.isReady));
+        readyButton.textContent = tr(me?.isReady ? "online.cancelReady" : "online.ready");
+        readyButton.disabled = room.phase !== "lobby";
+        readyButton.classList.toggle("ready", Boolean(me?.isReady));
+
+        const startButton = document.getElementById("start-battle-button");
+        startButton.hidden = !me?.isHost || room.phase !== "lobby";
+        startButton.disabled = !room.canStart;
+        const hint = document.getElementById("ready-hint");
+        hint.textContent = room.players.length < 2
+          ? tr("online.needPlayers")
+          : (room.canStart ? tr("online.readyToStart") : tr("online.waitingReady"));
       }
+
+      function toggleOnlineReady() {
+        const button = document.getElementById("ready-button");
+        const ready = button.dataset.ready !== "true";
+        button.disabled = true;
+        ensureOnlineSocket().emit("online:ready", { ready }, (result) => {
+          if (!result?.ok) button.disabled = false;
+        });
+      }
+
+      function startOnlineBattle() {
+        const button = document.getElementById("start-battle-button");
+        button.disabled = true;
+        document.getElementById("ready-hint").textContent = tr("online.starting");
+        ensureOnlineSocket().emit(
+          "online:start",
+          { language: currentLanguage },
+          (result) => {
+            if (!result?.ok) {
+              button.disabled = false;
+              document.getElementById("ready-hint").textContent =
+                result?.error || tr("online.connectError");
+            }
+          }
+        );
+      }
+
+      function beginOnlineBattle(state) {
+        window.onlineBattleState = { active: true, roomId: state.id };
+        document.getElementById("online-room").hidden = true;
+        document.getElementById("battle-result").hidden = true;
+        document.getElementById("battle-hud").hidden = false;
+        renderBattleProgress({
+          target: 3,
+          players: state.players.map((player) => ({
+            id: player.id,
+            name: player.name,
+            progress: 0
+          }))
+        });
+        enterGame(currentPlayerName);
+        window.farmGameReady.then(() => setTimeout(() => {
+          const farmScene = window.farmGame?.scene.getScene("FarmScene");
+          if (farmScene) farmScene.scene.restart();
+        }));
+      }
+
+      function renderBattleProgress(state) {
+        const list = document.getElementById("battle-progress-list");
+        list.replaceChildren(...state.players.map((player) => {
+          const row = document.createElement("span");
+          row.className = String(player.id) === currentUserId ? "me" : "";
+          row.textContent = `${player.name}: 🥕 ${player.progress}/${state.target}`;
+          return row;
+        }));
+      }
+
+      function showBattleResult(result) {
+        renderBattleProgress(result);
+        setGameInputEnabled(false);
+        const won = String(result.winnerId) === currentUserId;
+        const winner = result.players.find((player) => String(player.id) === String(result.winnerId));
+        document.getElementById("battle-result-icon").textContent = won ? "🏆" : "🌧️";
+        document.getElementById("battle-result-title").textContent =
+          tr(won ? "online.youWin" : "online.youLose");
+        document.getElementById("battle-result-message").textContent =
+          tr("online.winnerMessage", { name: winner?.name || "" });
+        document.getElementById("battle-result").hidden = false;
+        updateBattleCountdown(result.returnAt);
+      }
+
+      function updateBattleCountdown(returnAt) {
+        clearInterval(window.onlineBattleCountdown);
+        const update = () => {
+          const seconds = Math.max(0, Math.ceil((returnAt - Date.now()) / 1000));
+          document.getElementById("battle-return-countdown").textContent =
+            tr("online.returningLobby", { seconds });
+        };
+        update();
+        window.onlineBattleCountdown = setInterval(update, 250);
+      }
+
+      function returnToOnlineLobby(room) {
+        clearInterval(window.onlineBattleCountdown);
+        window.onlineBattleState = { active: false };
+        document.getElementById("battle-hud").hidden = true;
+        document.getElementById("battle-result").hidden = true;
+        const farmScene = window.farmGame?.scene.getScene("FarmScene");
+        if (farmScene) farmScene.scene.restart();
+        setGameInputEnabled(false);
+        document.getElementById("start-choices").hidden = true;
+        document.getElementById("online-menu").hidden = true;
+        document.getElementById("online-room").hidden = false;
+        const startScreen = document.getElementById("start-screen");
+        startScreen.classList.remove("leaving");
+        startScreen.hidden = false;
+        renderOnlineRoom(room);
+      }
+
+      document.body.addEventListener("online:carrot-planted", (event) => {
+        if (!window.onlineBattleState?.active || !onlineSocket?.connected) return;
+        onlineSocket.emit("online:plant", {
+          plotId: event.detail.plotId,
+          crop: "carrot"
+        });
+      });
+
+      document.body.addEventListener("online:carrot-harvested", (event) => {
+        if (!window.onlineBattleState?.active || !onlineSocket?.connected) return;
+        onlineSocket.emit("online:harvest", {
+          plotId: event.detail.plotId
+        });
+      });
 
       async function copyRoomCode() {
         if (!onlineRoomId) return;
@@ -401,6 +809,12 @@
           if (!response.ok) throw new Error(result.error || tr("restart.failed"));
 
           currentPlayerName = result.name;
+          currentUserInitialized = true;
+          const continueButton = document.getElementById("continue-button");
+          continueButton.hidden = false;
+          continueButton.disabled = false;
+          submitButton.disabled = false;
+          submitButton.textContent = tr("restart.confirm");
           document.body.dispatchEvent(new CustomEvent("farm:changed"));
           enterGame(result.name);
         } catch (error) {
@@ -424,10 +838,33 @@
         setGameInputEnabled(true);
       }
       function setGameInputEnabled(enabled) {
+        window.gameInputEnabled = enabled;
         window.farmGame?.scene.getScenes(true).forEach((scene) => {
-          if (scene.input) scene.input.enabled = enabled;
+          if (!scene.input) return;
+          scene.input.enabled = enabled;
+          if (scene.input.keyboard) scene.input.keyboard.enabled = enabled;
         });
       }
+      function focusGameInput() {
+        if (!document.getElementById("start-screen").hidden) return;
+        setGameInputEnabled(true);
+        const canvas = document.querySelector("#game-container canvas");
+        if (!canvas) return;
+        canvas.tabIndex = 0;
+        canvas.focus({ preventScroll: true });
+      }
+      document.getElementById("game-container").addEventListener("pointerdown", () => {
+        focusGameInput();
+      });
+      document.body.addEventListener("game:scene-ready", () => {
+        focusGameInput();
+      });
+      window.addEventListener("focus", () => {
+        if (document.getElementById("start-screen").hidden
+          && document.getElementById("battle-result").hidden) {
+          focusGameInput();
+        }
+      });
       function toggleQuickMenu(button) {
         const menu = button.closest(".top-actions");
         const isOpen = menu.classList.toggle("open");
@@ -507,7 +944,7 @@
         try {
           await loadLanguage();
           await initializeStartScreen();
-          await refreshPlayerProgress();
+          if (currentUserInitialized) await refreshPlayerProgress();
         } catch {
           document.getElementById("start-message").textContent =
             currentLanguage === "en"

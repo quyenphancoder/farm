@@ -31,7 +31,15 @@ export default class CropSystem {
   }
 
   async load() {
-    const state = await this.inventory.fetchState();
+    this.battleMode = Boolean(window.onlineBattleState?.active);
+    const state = this.battleMode
+      ? {
+          player: { level: 1, xp: 0, water_started_at: null },
+          inventory: [{ item: "carrot_seed", quantity: 3 }],
+          plots: [],
+          unlockedPlots: Array.from({ length: 8 }, (_, index) => index)
+        }
+      : await this.inventory.fetchState();
     this.savedPlots = new Map(state.plots.map((plot) => [plot.plot_id, plot]));
     this.unlockedPlots = new Set(state.unlockedPlots || [0, 1, 2, 3, 4]);
     this.inventoryCounts = new Map(state.inventory.map((item) => [item.item, item.quantity]));
@@ -139,13 +147,20 @@ export default class CropSystem {
     plot.busy = true;
     try {
       if (!plot.crop) {
-        try {
-          await this.refreshInventoryCounts();
-        } catch {
-          this.toast(this.t("plot.seedLoadFailed"));
-          return;
+        if (!this.battleMode) {
+          try {
+            await this.refreshInventoryCounts();
+          } catch {
+            this.toast(this.t("plot.seedLoadFailed"));
+            return;
+          }
         }
         this.showSeedPopup(plot);
+        return;
+      }
+
+      if (this.battleMode) {
+        this.harvestBattleCrop(plot);
         return;
       }
 
@@ -237,15 +252,28 @@ export default class CropSystem {
     this.closeSeedPopup();
     plot.busy = true;
     try {
-      const result = await this.inventory.request(`/api/game/plots/${plot.id}/plant`, {
-        seed: option.seed
-      });
+      const result = this.battleMode
+        ? {
+            ok: option.seed === "carrot_seed"
+              && (this.inventoryCounts.get("carrot_seed") || 0) > 0,
+            crop: "carrot",
+            plantedAt: Date.now()
+          }
+        : await this.inventory.request(`/api/game/plots/${plot.id}/plant`, {
+            seed: option.seed
+          });
       if (result.ok) {
         const currentCount = this.inventoryCounts.get(option.seed) || 0;
         this.inventoryCounts.set(option.seed, Math.max(0, currentCount - 1));
         this.scene.player.playAction(plot.image.x, plot.image.y);
         this.showCrop(plot, result.plantedAt, result.crop);
-        this.changed();
+        if (this.battleMode) {
+          document.body.dispatchEvent(new CustomEvent("online:carrot-planted", {
+            detail: { plotId: plot.id }
+          }));
+        } else {
+          this.changed();
+        }
       } else {
         this.toast(result.error);
       }
@@ -258,6 +286,33 @@ export default class CropSystem {
     const state = await this.inventory.fetchState();
     this.inventoryCounts = new Map(state.inventory.map((item) => [item.item, item.quantity]));
     this.updateSeedLocks(state.player?.level);
+  }
+
+  harvestBattleCrop(plot) {
+    const harvestedCrop = plot.crop;
+    const harvestedLabel = plot.label;
+    plot.crop = null;
+    plot.cropType = null;
+    plot.cropName = null;
+    plot.label = null;
+    plot.plantedAt = null;
+    plot.wateredAt = null;
+    plot.treatedAt = null;
+    harvestedLabel?.destroy();
+    this.scene.tweens.killTweensOf(harvestedCrop);
+    this.scene.tweens.add({
+      targets: harvestedCrop,
+      y: harvestedCrop.y - 25,
+      scaleX: .85,
+      scaleY: .85,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => harvestedCrop.destroy()
+    });
+    document.body.dispatchEvent(new CustomEvent("online:carrot-harvested", {
+      detail: { plotId: plot.id }
+    }));
+    this.toast("+1 carrot", "success");
   }
 
   updateSeedLocks(level = 1) {

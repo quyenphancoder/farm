@@ -16,17 +16,17 @@ const SELL_PRICES = {
 
 router.get("/state", (req, res) => {
   const db = req.app.locals.db;
-  const player = db.prepare("SELECT * FROM players WHERE id = 1").get();
-  const inventory = db.prepare("SELECT item, quantity FROM inventory WHERE player_id = 1").all();
+  const player = db.prepare("SELECT * FROM players WHERE id = current_player_id()").get();
+  const inventory = db.prepare("SELECT item, quantity FROM inventory WHERE player_id = current_player_id()").all();
   const plots = db.prepare(`
     SELECT plot_id, crop, planted_at, watered_at, treated_at
     FROM farm_state
-    WHERE player_id = 1 AND plot_id < ?
+    WHERE player_id = current_player_id() AND plot_id < ?
   `).all(TOTAL_PLOTS);
   const unlockedPlots = db.prepare(`
     SELECT plot_id
     FROM unlocked_plots
-    WHERE player_id = 1 AND plot_id < ?
+    WHERE player_id = current_player_id() AND plot_id < ?
   `).all(TOTAL_PLOTS)
     .map((plot) => plot.plot_id);
   res.json({ player, inventory, plots, unlockedPlots, serverTime: Date.now() });
@@ -46,7 +46,7 @@ router.post("/plots/:plotId/plant", (req, res) => {
     return res.status(400).json({ error: t(req.language, "plot.invalidSeed") });
   }
 
-  const player = db.prepare("SELECT level FROM players WHERE id = 1").get();
+  const player = db.prepare("SELECT level FROM players WHERE id = current_player_id()").get();
   if (player.level < selectedSeed.unlockLevel) {
     return res.status(403).json({
       error: t(req.language, "plot.levelRequired", { level: selectedSeed.unlockLevel })
@@ -54,7 +54,7 @@ router.post("/plots/:plotId/plant", (req, res) => {
   }
 
   const seed = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = ?"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = ?"
   ).get(seedItem);
 
   if (!Number.isInteger(plotId) || plotId < 0 || plotId >= TOTAL_PLOTS) {
@@ -72,12 +72,12 @@ router.post("/plots/:plotId/plant", (req, res) => {
     runTransaction(db, () => {
       const result = db.prepare(`
         INSERT INTO farm_state (player_id, plot_id, crop, planted_at)
-        VALUES (1, ?, ?, ?)
+        VALUES (current_player_id(), ?, ?, ?)
         ON CONFLICT(player_id, plot_id) DO NOTHING
       `).run(plotId, selectedSeed.crop, plantedAt);
       if (!result.changes) throw new Error(t(req.language, "plot.planted"));
       db.prepare(
-        "UPDATE inventory SET quantity = quantity - 1 WHERE player_id = 1 AND item = ?"
+        "UPDATE inventory SET quantity = quantity - 1 WHERE player_id = current_player_id() AND item = ?"
       ).run(seedItem);
     });
     res.json({ ok: true, crop: selectedSeed.crop, plantedAt });
@@ -90,7 +90,7 @@ router.post("/plots/:plotId/harvest", (req, res) => {
   const db = req.app.locals.db;
   const plotId = Number(req.params.plotId);
   const plot = db.prepare(
-    "SELECT * FROM farm_state WHERE player_id = 1 AND plot_id = ?"
+    "SELECT * FROM farm_state WHERE player_id = current_player_id() AND plot_id = ?"
   ).get(plotId);
 
   if (!plot) return res.status(404).json({ error: t(req.language, "plot.empty") });
@@ -101,18 +101,18 @@ router.post("/plots/:plotId/harvest", (req, res) => {
     return res.status(400).json({ error: t(req.language, "plot.notReady") });
   }
 
-  const player = db.prepare("SELECT level, xp FROM players WHERE id = 1").get();
+  const player = db.prepare("SELECT level, xp FROM players WHERE id = current_player_id()").get();
   const totalXp = player.xp + HARVEST_XP;
   const levelsGained = Math.floor(totalXp / XP_PER_LEVEL);
   const level = player.level + levelsGained;
   const xp = totalXp % XP_PER_LEVEL;
   runTransaction(db, () => {
-    db.prepare("DELETE FROM farm_state WHERE player_id = 1 AND plot_id = ?").run(plotId);
+    db.prepare("DELETE FROM farm_state WHERE player_id = current_player_id() AND plot_id = ?").run(plotId);
     db.prepare(`
-      INSERT INTO inventory (player_id, item, quantity) VALUES (1, ?, 1)
+      INSERT INTO inventory (player_id, item, quantity) VALUES (current_player_id(), ?, 1)
       ON CONFLICT(player_id, item) DO UPDATE SET quantity = quantity + 1
     `).run(plot.crop);
-    db.prepare("UPDATE players SET level = ?, xp = ? WHERE id = 1").run(level, xp);
+    db.prepare("UPDATE players SET level = ?, xp = ? WHERE id = current_player_id()").run(level, xp);
   });
   res.json({
     ok: true,
@@ -129,7 +129,7 @@ router.post("/plots/:plotId/water", (req, res) => {
   const db = req.app.locals.db;
   const plotId = Number(req.params.plotId);
   const plot = db.prepare(
-    "SELECT * FROM farm_state WHERE player_id = 1 AND plot_id = ?"
+    "SELECT * FROM farm_state WHERE player_id = current_player_id() AND plot_id = ?"
   ).get(plotId);
 
   if (!plot) return res.status(404).json({ error: t(req.language, "plot.empty") });
@@ -144,7 +144,7 @@ router.post("/plots/:plotId/water", (req, res) => {
   }
 
   const water = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = 'water'"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = 'water'"
   ).get();
   if (!water || water.quantity < 1) {
     return res.status(400).json({ error: t(req.language, "plot.noWater") });
@@ -155,12 +155,12 @@ router.post("/plots/:plotId/water", (req, res) => {
     db.prepare(`
       UPDATE farm_state
       SET watered_at = ?
-      WHERE player_id = 1 AND plot_id = ? AND watered_at IS NULL
+      WHERE player_id = current_player_id() AND plot_id = ? AND watered_at IS NULL
     `).run(wateredAt, plotId);
     db.prepare(`
       UPDATE inventory
       SET quantity = quantity - 1
-      WHERE player_id = 1 AND item = 'water'
+      WHERE player_id = current_player_id() AND item = 'water'
     `).run();
   });
 
@@ -171,7 +171,7 @@ router.post("/plots/:plotId/pesticide", (req, res) => {
   const db = req.app.locals.db;
   const plotId = Number(req.params.plotId);
   const plot = db.prepare(
-    "SELECT * FROM farm_state WHERE player_id = 1 AND plot_id = ?"
+    "SELECT * FROM farm_state WHERE player_id = current_player_id() AND plot_id = ?"
   ).get(plotId);
 
   if (!plot) return res.status(404).json({ error: t(req.language, "plot.empty") });
@@ -189,7 +189,7 @@ router.post("/plots/:plotId/pesticide", (req, res) => {
   }
 
   const pesticide = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = 'pesticide'"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = 'pesticide'"
   ).get();
   if (!pesticide || pesticide.quantity < 1) {
     return res.status(400).json({ error: t(req.language, "plot.noPesticide") });
@@ -200,12 +200,12 @@ router.post("/plots/:plotId/pesticide", (req, res) => {
     db.prepare(`
       UPDATE farm_state
       SET treated_at = ?
-      WHERE player_id = 1 AND plot_id = ? AND treated_at IS NULL
+      WHERE player_id = current_player_id() AND plot_id = ? AND treated_at IS NULL
     `).run(treatedAt, plotId);
     db.prepare(`
       UPDATE inventory
       SET quantity = quantity - 1
-      WHERE player_id = 1 AND item = 'pesticide'
+      WHERE player_id = current_player_id() AND item = 'pesticide'
     `).run();
   });
 
@@ -215,12 +215,12 @@ router.post("/plots/:plotId/pesticide", (req, res) => {
 router.post("/well/collect", (req, res) => {
   const db = req.app.locals.db;
   const player = db.prepare(
-    "SELECT water_started_at FROM players WHERE id = 1"
+    "SELECT water_started_at FROM players WHERE id = current_player_id()"
   ).get();
   const now = Date.now();
 
   if (!player?.water_started_at) {
-    db.prepare("UPDATE players SET water_started_at = ? WHERE id = 1").run(now);
+    db.prepare("UPDATE players SET water_started_at = ? WHERE id = current_player_id()").run(now);
     return res.json({
       ok: true,
       collecting: true,
@@ -234,14 +234,14 @@ router.post("/well/collect", (req, res) => {
   }
 
   runTransaction(db, () => {
-    db.prepare("UPDATE players SET water_started_at = NULL WHERE id = 1").run();
+    db.prepare("UPDATE players SET water_started_at = NULL WHERE id = current_player_id()").run();
     db.prepare(`
-      INSERT INTO inventory (player_id, item, quantity) VALUES (1, 'water', 1)
+      INSERT INTO inventory (player_id, item, quantity) VALUES (current_player_id(), 'water', 1)
       ON CONFLICT(player_id, item) DO UPDATE SET quantity = quantity + 1
     `).run();
   });
   const quantity = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = 'water'"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = 'water'"
   ).get().quantity;
 
   res.json({ ok: true, collected: true, item: "water", quantity });
@@ -250,7 +250,7 @@ router.post("/well/collect", (req, res) => {
 router.post("/land/unlock", (req, res) => {
   const db = req.app.locals.db;
   const plotId = Number(req.body.plotId);
-  const player = db.prepare("SELECT diamonds FROM players WHERE id = 1").get();
+  const player = db.prepare("SELECT diamonds FROM players WHERE id = current_player_id()").get();
 
   if (!Number.isInteger(plotId) || plotId < 0 || plotId >= TOTAL_PLOTS) {
     return res.status(400).json({ error: t(req.language, "plot.invalid") });
@@ -268,18 +268,18 @@ router.post("/land/unlock", (req, res) => {
     db.prepare(`
       UPDATE players
       SET diamonds = diamonds - ?
-      WHERE id = 1
+      WHERE id = current_player_id()
     `).run(LAND_UNLOCK_COST);
-    db.prepare("INSERT INTO unlocked_plots (player_id, plot_id) VALUES (1, ?)").run(plotId);
+    db.prepare("INSERT INTO unlocked_plots (player_id, plot_id) VALUES (current_player_id(), ?)").run(plotId);
   });
 
-  const updated = db.prepare("SELECT diamonds FROM players WHERE id = 1").get();
+  const updated = db.prepare("SELECT diamonds FROM players WHERE id = current_player_id()").get();
   res.json({ ok: true, diamonds: updated.diamonds, plotId });
 });
 
 router.get("/hud", (req, res) => {
   const db = req.app.locals.db;
-  const player = db.prepare("SELECT coins, diamonds FROM players WHERE id = 1").get();
+  const player = db.prepare("SELECT coins, diamonds FROM players WHERE id = current_player_id()").get();
 
   res.send(`
     <span class="resource-pill">
@@ -294,7 +294,7 @@ router.get("/hud", (req, res) => {
 router.get("/inventory", (req, res) => {
   const db = req.app.locals.db;
   const items = db.prepare(
-    "SELECT item, quantity FROM inventory WHERE player_id = 1 AND quantity > 0 ORDER BY item"
+    "SELECT item, quantity FROM inventory WHERE player_id = current_player_id() AND quantity > 0 ORDER BY item"
   ).all();
   const meta = {
     carrot_seed: { name: t(req.language, "item.carrotSeed"), icon: "🌱" },
@@ -382,7 +382,7 @@ router.post("/sell", (req, res) => {
   }
 
   const stock = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = ?"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = ?"
   ).get(item)?.quantity ?? 0;
   if (stock < quantity) {
     return res.status(400).send(t(req.language, "inventory.notEnough", { available: stock }));
@@ -393,9 +393,9 @@ router.post("/sell", (req, res) => {
     db.prepare(`
       UPDATE inventory
       SET quantity = quantity - ?
-      WHERE player_id = 1 AND item = ?
+      WHERE player_id = current_player_id() AND item = ?
     `).run(quantity, item);
-    db.prepare("UPDATE players SET coins = coins + ? WHERE id = 1").run(earned);
+    db.prepare("UPDATE players SET coins = coins + ? WHERE id = current_player_id()").run(earned);
   });
 
   res.send(t(req.language, "inventory.sold", {
@@ -408,10 +408,10 @@ router.post("/sell", (req, res) => {
 router.get("/quests", (req, res) => {
   const db = req.app.locals.db;
   const carrots = db.prepare(
-    "SELECT quantity FROM inventory WHERE player_id = 1 AND item = 'carrot'"
+    "SELECT quantity FROM inventory WHERE player_id = current_player_id() AND item = 'carrot'"
   ).get()?.quantity ?? 0;
   const planted = db.prepare(
-    "SELECT COUNT(*) AS count FROM farm_state WHERE player_id = 1"
+    "SELECT COUNT(*) AS count FROM farm_state WHERE player_id = current_player_id()"
   ).get().count;
   const carrotProgress = Math.min(carrots, 3);
   const plantProgress = Math.min(planted, 5);
@@ -497,6 +497,6 @@ export default router;
 
 function isPlotUnlocked(db, plotId) {
   return Boolean(db.prepare(
-    "SELECT 1 FROM unlocked_plots WHERE player_id = 1 AND plot_id = ?"
+    "SELECT 1 FROM unlocked_plots WHERE player_id = current_player_id() AND plot_id = ?"
   ).get(plotId));
 }

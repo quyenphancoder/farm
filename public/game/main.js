@@ -1,11 +1,10 @@
 import PreloadScene from "./scenes/PreloadScene.js";
 import FarmScene from "./scenes/FarmScene.js";
 
-const renderResolution = Math.min(2, Math.max(
-  window.devicePixelRatio || 1,
-  window.innerWidth / 960,
-  window.innerHeight / 600
-));
+const renderResolution = Math.min(
+  3,
+  Math.max(1, window.devicePixelRatio || 1)
+);
 
 function launchGame() {
   window.farmGame = new Phaser.Game({

@@ -8,6 +8,10 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   async create() {
+    const inputEnabled = window.gameInputEnabled !== false;
+    this.input.enabled = inputEnabled;
+    if (this.input.keyboard) this.input.keyboard.enabled = inputEnabled;
+
     this.baseMapWidth = 1067;
     this.baseMapHeight = 600;
     this.mapScale = 1;
@@ -46,10 +50,16 @@ export default class FarmScene extends Phaser.Scene {
 
     try {
       const state = await this.crops.load();
-      this.restoreWellCollection(state.player?.water_started_at);
+      if (this.crops.battleMode) {
+        this.wellButton.setVisible(false).disableInteractive();
+        this.wellTimerText.setVisible(false);
+      } else {
+        this.restoreWellCollection(state.player?.water_started_at);
+      }
     } catch {
       this.crops.toast(window.i18n?.t("game.loadFailed") || "Unable to load farm data.");
     }
+    document.body.dispatchEvent(new CustomEvent("game:scene-ready"));
   }
 
   update(_time, delta) {
@@ -120,6 +130,7 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   async collectWater(requireNearby = true) {
+    if (this.crops?.battleMode) return;
     if (this.wellRequesting) return;
     if (requireNearby) {
       const distance = Phaser.Math.Distance.Between(
