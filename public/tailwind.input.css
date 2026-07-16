@@ -1,0 +1,12 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "./index.html";
+@source "./game/**/*.js";
+
+@theme {
+  --font-cultivation: "Baloo 2", "Nunito", sans-serif;
+  --color-spirit-gold: #f8d56b;
+  --color-spirit-jade: #78d9b0;
+  --color-night-jade: #071b16;
+}

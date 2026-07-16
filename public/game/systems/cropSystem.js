@@ -9,15 +9,25 @@ export default class CropSystem {
     this.unlockedPlots = new Set();
     this.landUnlockCost = 50;
     this.cropGrowthMs = 10000;
+    this.cropMaxSize = {
+      width: 38,
+      height: 43
+    };
+    // === TỌA ĐỘ CÁC Ô ĐẤT CÓ THỂ CHỈNH TẠI ĐÂY ===
+    const debugLayout = scene.farmLayout?.plots || {};
     this.layout = {
       rows: 5,
-      cols: 8,
-      plotWidth: 48,
-      plotHeight: 40,
-      plotSpacingX: 50,
-      plotSpacingY: 42,
-      gridStartX: 480 + (scene.mapOffsetX || 0) - 50 * 3.5,
-      gridStartY: 255 + (scene.mapOffsetY || 0)
+      cols: 10,
+      patchCols: 5,
+      plotWidth: debugLayout.plotWidth ?? 44,
+      plotHeight: debugLayout.plotHeight ?? 44,
+      plotSpacingX: debugLayout.plotSpacingX ?? 62,
+      plotSpacingY: debugLayout.plotSpacingY ?? 50,
+      patchGapX: debugLayout.patchGapX ?? 142,
+      leftPatchOffsetX: debugLayout.leftPatchOffsetX ?? -43,
+      rightPatchOffsetX: debugLayout.rightPatchOffsetX ?? 50,
+      gridCenterX: (debugLayout.gridCenterX ?? 486) + (scene.mapOffsetX || 0),
+      gridStartY: (debugLayout.gridStartY ?? 280) + (scene.mapOffsetY || 0)
     };
     this.seedPopup = null;
     this.confirmPopup = null;
@@ -35,9 +45,12 @@ export default class CropSystem {
     const state = this.battleMode
       ? {
           player: { level: 1, xp: 0, water_started_at: null },
-          inventory: [{ item: "carrot_seed", quantity: 3 }],
+          inventory: [
+            { item: "carrot_seed", quantity: 3 },
+            { item: "water", quantity: 0 }
+          ],
           plots: [],
-          unlockedPlots: Array.from({ length: 8 }, (_, index) => index)
+          unlockedPlots: Array.from({ length: 10 }, (_, index) => index)
         }
       : await this.inventory.fetchState();
     this.savedPlots = new Map(state.plots.map((plot) => [plot.plot_id, plot]));
@@ -47,7 +60,7 @@ export default class CropSystem {
 
     for (let row = 0; row < this.layout.rows; row += 1) {
       for (let col = 0; col < this.layout.cols; col += 1) {
-        const plotId = row * this.layout.cols + col;
+        const plotId = this.getPlotId(row, col);
         if (this.unlockedPlots.has(plotId)) {
           this.addPlot(row, col);
         } else {
@@ -62,15 +75,40 @@ export default class CropSystem {
     for (let col = 0; col < this.layout.cols; col += 1) this.addPlot(row, col);
   }
 
-  addPlot(row, col) {
-    const { plotWidth, plotHeight, plotSpacingX, plotSpacingY, gridStartX, gridStartY } = this.layout;
-    const id = row * this.layout.cols + col;
-    const x = gridStartX + col * plotSpacingX;
+  getPlotId(row, col) {
+    return row * this.layout.cols + col;
+  }
+
+  getPlotPosition(row, col) {
+    const {
+      cols,
+      patchCols,
+      plotSpacingX,
+      plotSpacingY,
+      patchGapX,
+      gridCenterX,
+      gridStartY
+    } = this.layout;
+    const patchIndex = Math.floor(col / patchCols);
+    const colInPatch = col % patchCols;
+    const patchWidth = (patchCols - 1) * plotSpacingX;
+    const totalWidth = patchWidth * 2 + patchGapX;
+    const leftPatchStartX = gridCenterX - totalWidth / 2;
+    const rightPatchStartX = leftPatchStartX + patchWidth + patchGapX;
+    const patchOffsetX = patchIndex === 0 ? this.layout.leftPatchOffsetX : this.layout.rightPatchOffsetX;
+    const x = (patchIndex === 0 ? leftPatchStartX : rightPatchStartX) + colInPatch * plotSpacingX + patchOffsetX;
     const y = gridStartY + row * plotSpacingY;
+
+    return { x, y, id: row * cols + col };
+  }
+
+  addPlot(row, col) {
+    const { plotWidth, plotHeight } = this.layout;
+    const { x, y, id } = this.getPlotPosition(row, col);
     const image = this.scene.add.image(x, y, "plot")
       .setDisplaySize(plotWidth, plotHeight)
-      .setDepth(3 + row * .01)
-      .setInteractive({ useHandCursor: true });
+      .setDepth(3 + row * .01);
+    this.scene.setGameInteractive(image);
     const plot = {
       id,
       image,
@@ -82,8 +120,12 @@ export default class CropSystem {
       busy: false
     };
 
-    image.on("pointerover", () => image.setDisplaySize(plotWidth + 4, plotHeight + 4).setTint(0xfff0b8));
-    image.on("pointerout", () => image.setDisplaySize(plotWidth, plotHeight).clearTint());
+    image.on("pointerover", () => image
+      .setTint(0xffffdf)
+      .setBlendMode(Phaser.BlendModes.SCREEN));
+    image.on("pointerout", () => image
+      .clearTint()
+      .setBlendMode(Phaser.BlendModes.NORMAL));
     image.on("pointerdown", (pointer) => {
       if (!pointer.leftButtonDown()) return;
       pointer.event.stopPropagation();
@@ -104,36 +146,44 @@ export default class CropSystem {
   }
 
   addLockedPlot(row, col) {
-    const { plotWidth, plotHeight, plotSpacingX, plotSpacingY, gridStartX, gridStartY } = this.layout;
-    const plotId = row * this.layout.cols + col;
-    const x = gridStartX + col * plotSpacingX;
-    const y = gridStartY + row * plotSpacingY;
+    const { plotWidth, plotHeight } = this.layout;
+    const { x, y, id: plotId } = this.getPlotPosition(row, col);
     const soil = this.scene.add.image(x, y, "plot")
       .setDisplaySize(plotWidth, plotHeight)
       .setDepth(3 + row * .01)
-      .setTint(0x5c4934)
-      .setAlpha(.82)
-      .setInteractive({ useHandCursor: true });
-    const lockIcon = this.scene.add.text(x, y - 2, "🔒", {
-      fontFamily: "Arial, sans-serif",
-      fontSize: "20px"
-    })
-      .setOrigin(.5)
-      .setDepth(12 + row * .01)
-      .setShadow(0, 2, "#00000099", 2)
-      .setInteractive({ useHandCursor: true });
+      .setTint(0x8a765c)
+      .setAlpha(.95);
+    this.scene.setGameInteractive(soil);
+    const lockShadow = this.scene.add.image(x, y + 13, "soil-lock-shadow")
+      .setDisplaySize(32, 10)
+      .setAlpha(.42)
+      .setDepth(11 + row * .01);
+    const lockIcon = this.scene.add.image(x, y + 1, "soil-lock")
+      .setDisplaySize(34, 34)
+      .setDepth(12 + row * .01);
+    this.scene.setGameInteractive(lockIcon);
 
     const confirm = (pointer) => {
       if (!pointer.leftButtonDown()) return;
       pointer.event.stopPropagation();
       this.showUnlockConfirm(plotId, row, col);
     };
-    soil.on("pointerover", () => soil.setTint(0x6c543c).setAlpha(.9));
-    soil.on("pointerout", () => soil.setTint(0x5c4934).setAlpha(.82));
+    const highlightSoil = () => soil
+      .setTint(0xffddb0)
+      .setAlpha(1)
+      .setBlendMode(Phaser.BlendModes.SCREEN);
+    const resetSoil = () => soil
+      .setTint(0x8a765c)
+      .setAlpha(.95)
+      .setBlendMode(Phaser.BlendModes.NORMAL);
+    soil.on("pointerover", highlightSoil);
+    soil.on("pointerout", resetSoil);
     soil.on("pointerdown", confirm);
+    lockIcon.on("pointerover", highlightSoil);
+    lockIcon.on("pointerout", resetSoil);
     lockIcon.on("pointerdown", confirm);
 
-    this.lockedPlots[plotId] = { soil, lockIcon };
+    this.lockedPlots[plotId] = { soil, lockIcon, lockShadow };
   }
 
   async interact(plot) {
@@ -159,17 +209,25 @@ export default class CropSystem {
         return;
       }
 
-      if (this.battleMode) {
-        this.harvestBattleCrop(plot);
-        return;
-      }
-
       if (!plot.wateredAt && Date.now() - plot.plantedAt < this.cropGrowthMs) {
         this.toast(this.t("plot.growing", { crop: plot.cropName || this.t("plot.crop") }));
         return;
       }
 
       if (!plot.wateredAt) {
+        if (this.battleMode) {
+          const waterCount = this.inventoryCounts.get("water") || 0;
+          if (waterCount < 1) {
+            this.toast(this.t("plot.noWater"));
+            return;
+          }
+          plot.wateredAt = Date.now();
+          this.inventoryCounts.set("water", waterCount - 1);
+          this.scene.player.playAction(plot.image.x, plot.image.y);
+          this.toast(this.t("plot.watered"), "success");
+          return;
+        }
+
         const result = await this.inventory.request(`/api/game/plots/${plot.id}/water`);
         if (result.ok) {
           plot.wateredAt = Number(result.wateredAt);
@@ -181,6 +239,15 @@ export default class CropSystem {
         } else {
           this.toast(result.error);
         }
+        return;
+      }
+
+      if (this.battleMode) {
+        if (Date.now() - plot.wateredAt < this.cropGrowthMs) {
+          this.toast(this.t("plot.growing", { crop: plot.cropName || this.t("plot.crop") }));
+          return;
+        }
+        this.harvestBattleCrop(plot);
         return;
       }
 
@@ -325,63 +392,27 @@ export default class CropSystem {
   showUnlockConfirm(plotId, row, col) {
     this.closeSeedPopup();
     this.closeConfirmPopup();
-
-    const { plotSpacingX, plotSpacingY, gridStartX, gridStartY } = this.layout;
-    const width = 232;
-    const height = 112;
-    const x = Phaser.Math.Clamp(gridStartX + col * plotSpacingX, width / 2 + 12, 960 - width / 2 - 12);
-    const y = Phaser.Math.Clamp(gridStartY + row * plotSpacingY - 80, height / 2 + 12, 600 - height / 2 - 12);
-    const popup = this.scene.add.container(x, y).setDepth(110);
-    const graphics = this.scene.add.graphics();
-    const blocker = this.scene.add.zone(0, 0, width, height).setOrigin(.5).setInteractive();
-
-    blocker.on("pointerdown", (pointer) => pointer.event.stopPropagation());
-    graphics.fillStyle(0x101c16, 1).fillRoundedRect(-width / 2, -height / 2, width, height, 14);
-    graphics.lineStyle(3, 0xffe08a, .95).strokeRoundedRect(-width / 2, -height / 2, width, height, 14);
-    popup.add([blocker, graphics]);
-    popup.add(this.scene.add.text(0, -33, this.t("plot.buyQuestion"), {
-      fontFamily: "Nunito, sans-serif",
-      fontSize: "15px",
-      fontStyle: "bold",
-      color: "#fff1b8"
-    }).setOrigin(.5));
-    popup.add(this.scene.add.text(0, -8, this.t("plot.price", { cost: this.landUnlockCost }), {
-      fontFamily: "Nunito, sans-serif",
-      fontSize: "13px",
-      fontStyle: "bold",
-      color: "#ffffff"
-    }).setOrigin(.5));
-
-    const cancel = this.createConfirmButton(-50, 31, this.t("plot.cancel"), 0x38453b, () => this.closeConfirmPopup());
-    const buy = this.createConfirmButton(52, 31, this.t("plot.buy"), 0x4f7b3f, () => this.unlockLand(plotId, row, col));
-    popup.add([cancel, buy]);
-    this.confirmPopup = popup;
-  }
-
-  createConfirmButton(x, y, label, color, onClick) {
-    const button = this.scene.add.container(x, y);
-    const bg = this.scene.add.rectangle(0, 0, 82, 28, color, 1)
-      .setStrokeStyle(1, 0xffe08a, .55)
-      .setInteractive({ useHandCursor: true });
-    const text = this.scene.add.text(0, 0, label, {
-      fontFamily: "Nunito, sans-serif",
-      fontSize: "12px",
-      fontStyle: "bold",
-      color: "#ffffff"
-    }).setOrigin(.5);
-
-    bg.on("pointerover", () => bg.setFillStyle(color + 0x101010, 1));
-    bg.on("pointerout", () => bg.setFillStyle(color, 1));
-    bg.on("pointerdown", (pointer) => {
-      pointer.event.stopPropagation();
-      onClick();
+    const price = document.createElement("p");
+    price.className = "game-modal__price";
+    price.textContent = this.t("plot.price", { cost: this.landUnlockCost });
+    this.confirmPopup = true;
+    window.openGameModal({
+      title: this.t("plot.buyQuestion"),
+      content: price,
+      actions: [
+        { label: this.t("plot.cancel"), onClick: () => { this.confirmPopup = null; } },
+        {
+          label: this.t("plot.buy"),
+          primary: true,
+          onClick: () => this.unlockLand(plotId, row, col)
+        }
+      ],
+      onClose: () => { this.confirmPopup = null; }
     });
-    button.add([bg, text]);
-    return button;
   }
 
   closeConfirmPopup() {
-    this.confirmPopup?.destroy(true);
+    if (this.confirmPopup) window.closeGameModal?.(false);
     this.confirmPopup = null;
   }
 
@@ -396,6 +427,7 @@ export default class CropSystem {
     this.unlockedPlots.add(plotId);
     this.lockedPlots[plotId]?.soil.destroy();
     this.lockedPlots[plotId]?.lockIcon.destroy();
+    this.lockedPlots[plotId]?.lockShadow.destroy();
     this.lockedPlots[plotId] = null;
     this.addPlot(row, col);
     this.changed();
@@ -405,84 +437,32 @@ export default class CropSystem {
   showSeedPopup(plot) {
     this.closeSeedPopup();
     this.closeConfirmPopup();
-
-    const width = 238;
-    const rowHeight = 34;
-    const height = 52 + this.seedOptions.length * rowHeight;
-    const x = Phaser.Math.Clamp(plot.image.x, width / 2 + 12, 960 - width / 2 - 12);
-    const y = Phaser.Math.Clamp(plot.image.y - 112, height / 2 + 12, 600 - height / 2 - 12);
-    const popup = this.scene.add.container(x, y).setDepth(100);
-    const graphics = this.scene.add.graphics();
-
-    const blocker = this.scene.add.zone(0, 0, width, height)
-      .setOrigin(.5)
-      .setInteractive();
-    blocker.on("pointerdown", (pointer) => pointer.event.stopPropagation());
-    popup.add(blocker);
-
-    graphics.fillStyle(0x101c16, 1).fillRoundedRect(-width / 2, -height / 2, width, height, 14);
-    graphics.lineStyle(3, 0xffe08a, .95).strokeRoundedRect(-width / 2, -height / 2, width, height, 14);
-    popup.add(graphics);
-    const titleY = -height / 2 + 20;
-    popup.add(this.scene.add.text(-width / 2 + 14, titleY, this.t("plot.chooseSeed"), {
-      fontFamily: "Nunito, sans-serif",
-      fontSize: "14px",
-      fontStyle: "bold",
-      color: "#fff1b8"
-    }).setOrigin(0, .5));
-
-    const closeButton = this.scene.add.text(width / 2 - 22, titleY - 4, "×", {
-      fontFamily: "Nunito, sans-serif",
-      fontSize: "22px",
-      fontStyle: "bold",
-      color: "#ffe2a0"
-    }).setOrigin(.5).setInteractive({ useHandCursor: true });
-    closeButton.on("pointerdown", (pointer) => {
-      pointer.event.stopPropagation();
-      this.closeSeedPopup();
-    });
-    popup.add(closeButton);
-
+    const choices = document.createElement("div");
+    choices.className = "game-modal__seed-list grid gap-3 p-1";
     this.seedOptions.forEach((option, index) => {
       const count = this.inventoryCounts.get(option.seed) || 0;
       const disabled = option.locked || count <= 0;
-      const rowY = -height / 2 + 46 + index * rowHeight;
-      const row = this.scene.add.rectangle(0, rowY, width - 24, 28, disabled ? 0x263229 : 0x3f6b44, 1)
-        .setStrokeStyle(1, disabled ? 0x65735f : 0xd2ff87, disabled ? .45 : .95);
-      const label = `${option.icon} ${option.name}`;
       const detail = option.locked
         ? this.t("shop.level", { level: option.unlockLevel })
         : `x${count}`;
-      const nameText = this.scene.add.text(-width / 2 + 22, rowY, label, {
-        fontFamily: "Nunito, sans-serif",
-        fontSize: "12px",
-        fontStyle: "bold",
-        color: disabled ? "#9fa99b" : "#ffffff"
-      }).setOrigin(0, .5);
-      const countText = this.scene.add.text(width / 2 - 24, rowY, detail, {
-        fontFamily: "Nunito, sans-serif",
-        fontSize: "11px",
-        fontStyle: "bold",
-        color: disabled ? "#adb5a5" : "#ffe27b"
-      }).setOrigin(1, .5);
-
-      popup.add([row, nameText, countText]);
-      if (!disabled) {
-        row.setInteractive({ useHandCursor: true });
-        row.on("pointerover", () => row.setFillStyle(0x568a4d, 1));
-        row.on("pointerout", () => row.setFillStyle(0x3f6b44, 1));
-        row.on("pointerdown", (pointer) => {
-          pointer.event.stopPropagation();
-          this.plant(plot, option);
-        });
-      }
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "game-modal__choice flex w-full items-center justify-between rounded-xl border border-[#e8c86655] bg-[linear-gradient(90deg,#17372d,#10291f)] px-3.5 py-2.5 text-left font-extrabold text-[#effaf3] shadow-[inset_0_1px_0_#fff1] transition hover:scale-[1.01] hover:border-[#f8d56baa] hover:brightness-115 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40";
+      button.disabled = disabled;
+      button.innerHTML = `<span>${option.icon} ${option.name}</span><small>${detail}</small>`;
+      button.addEventListener("click", () => this.plant(plot, option));
+      choices.appendChild(button);
     });
-
-    this.seedPopup = popup;
+    this.seedPopup = true;
+    window.openGameModal({
+      title: this.t("plot.chooseSeed"),
+      content: choices,
+      onClose: () => { this.seedPopup = null; }
+    });
   }
 
   closeSeedPopup() {
-    this.seedPopup?.destroy(true);
+    if (this.seedPopup) window.closeGameModal?.(false);
     this.seedPopup = null;
   }
 
@@ -495,11 +475,11 @@ export default class CropSystem {
     plot.cropType = cropType;
     plot.cropName = cropInfo.cropName;
     const texture = this.scene.textures.exists(cropType) ? cropType : "carrot";
-    plot.crop = this.scene.add.image(plot.image.x, plot.image.y - 2, texture)
-      .setScale(.04)
+    plot.crop = this.scene.add.image(plot.image.x, plot.image.y + 12, texture)
+      .setScale(this.getCropScale(texture, .28))
       .setDepth(5)
-      .setOrigin(.5)
-      .setInteractive({ useHandCursor: true });
+      .setOrigin(.5, 1);
+    this.scene.setGameInteractive(plot.crop);
     const labelBackground = this.scene.add.graphics();
     const labelText = this.scene.add.text(0, 0, "", {
       fontFamily: "Nunito, sans-serif",
@@ -507,16 +487,20 @@ export default class CropSystem {
       fontStyle: "bold",
       color: "#fff9d8"
     }).setOrigin(.5).setResolution(2);
+    const labelWaterDrop = this.scene.add.image(0, 0, "water-drop")
+      .setDisplaySize(14, 14)
+      .setVisible(false);
     plot.label = this.scene.add.container(
       plot.image.x,
       plot.image.y + 14,
-      [labelBackground, labelText]
+      [labelBackground, labelText, labelWaterDrop]
     )
       .setSize(18, 18)
-      .setDepth(6)
-      .setInteractive({ useHandCursor: true });
+      .setDepth(6);
+    this.scene.setGameInteractive(plot.label);
     plot.labelBackground = labelBackground;
     plot.labelText = labelText;
+    plot.labelWaterDrop = labelWaterDrop;
     plot.labelState = null;
     const interactWithCrop = (pointer) => {
       if (!pointer.leftButtonDown()) return;
@@ -542,15 +526,21 @@ export default class CropSystem {
       const finalGrowth = plot.treatedAt
         ? Phaser.Math.Clamp((now - plot.treatedAt) / this.cropGrowthMs, 0, 1)
         : 0;
+      const matureScale = this.getCropScale(plot.crop.texture.key, 1);
       const growthScale = plot.treatedAt
-        ? Phaser.Math.Linear(.12, .15, Phaser.Math.Easing.Sine.InOut(finalGrowth))
+        ? Phaser.Math.Linear(matureScale * .8, matureScale, Phaser.Math.Easing.Sine.InOut(finalGrowth))
         : (plot.wateredAt
-          ? Phaser.Math.Linear(.1, .12, Phaser.Math.Easing.Sine.InOut(secondGrowth))
-          : Phaser.Math.Linear(.04, .1, Phaser.Math.Easing.Sine.InOut(firstGrowth)));
+          ? Phaser.Math.Linear(matureScale * .66, matureScale * .8, Phaser.Math.Easing.Sine.InOut(secondGrowth))
+          : Phaser.Math.Linear(matureScale * .28, matureScale * .66, Phaser.Math.Easing.Sine.InOut(firstGrowth)));
       plot.crop.setScale(growthScale);
       const needsWater = !plot.wateredAt && firstGrowth === 1;
-      const needsPesticide = Boolean(plot.wateredAt) && !plot.treatedAt && secondGrowth === 1;
-      const ready = Boolean(plot.treatedAt) && finalGrowth === 1;
+      const needsPesticide = !this.battleMode
+        && Boolean(plot.wateredAt)
+        && !plot.treatedAt
+        && secondGrowth === 1;
+      const ready = this.battleMode
+        ? Boolean(plot.wateredAt) && secondGrowth === 1
+        : Boolean(plot.treatedAt) && finalGrowth === 1;
       const state = ready
         ? "ready"
         : (needsPesticide ? "pesticide" : (needsWater ? "water" : "growing"));
@@ -559,15 +549,15 @@ export default class CropSystem {
         : (plot.wateredAt
           ? Math.max(0, this.cropGrowthMs - (now - plot.wateredAt))
           : Math.max(0, this.cropGrowthMs - (now - plot.plantedAt)));
-      plot.labelText.setText(
-        state === "ready"
-          ? "✓"
-          : (state === "water"
-            ? "💧"
-            : (state === "pesticide" ? "🧴" : String(Math.ceil(left / 1000))))
-      );
+      const nextLabel = state === "ready"
+        ? "✓"
+        : (state === "water"
+          ? ""
+          : (state === "pesticide" ? "🧴" : String(Math.ceil(left / 1000))));
+      if (plot.labelText.text !== nextLabel) plot.labelText.setText(nextLabel);
       if (plot.labelState !== state) {
         plot.labelState = state;
+        plot.labelWaterDrop.setVisible(state === "water");
         plot.label.setPosition(
           plot.image.x + 14,
           plot.image.y + 8
@@ -580,14 +570,77 @@ export default class CropSystem {
           )
           .setColor(ready ? "#fff0a6" : "#ffffff")
           .setStroke("#315c2f", 0);
-        plot.labelBackground
-          .clear()
-          .fillStyle(0x315c2f, .98)
-          .fillCircle(0, 0, 7)
-          .lineStyle(1, 0xe2c86f, 1)
-          .strokeCircle(0, 0, 6.5);
+        plot.labelBackground.clear();
+        if (state !== "water") {
+          plot.labelBackground
+            .fillStyle(0x315c2f, .98)
+            .fillCircle(0, 0, 7)
+            .lineStyle(1, 0xe2c86f, 1)
+            .strokeCircle(0, 0, 6.5);
+        }
       }
       plot.crop.setTint(ready ? 0xffffff : 0xc1c99e);
+    }
+  }
+
+  getCropScale(textureKey, ratio = 1) {
+    const texture = this.scene.textures.get(textureKey);
+    const source = texture?.getSourceImage?.();
+    const sourceWidth = source?.width || 1;
+    const sourceHeight = source?.height || 1;
+    const maxScale = Math.min(
+      this.cropMaxSize.width / sourceWidth,
+      this.cropMaxSize.height / sourceHeight
+    );
+    return maxScale * ratio;
+  }
+
+  applyDebugLayout(nextLayout = {}) {
+    const offsetX = this.scene.mapOffsetX || 0;
+    const offsetY = this.scene.mapOffsetY || 0;
+    Object.assign(this.layout, nextLayout, {
+      gridCenterX: (nextLayout.gridCenterX ?? 486) + offsetX,
+      gridStartY: (nextLayout.gridStartY ?? 280) + offsetY
+    });
+
+    this.plots.forEach((plot) => {
+      const row = Math.floor(plot.id / this.layout.cols);
+      const col = plot.id % this.layout.cols;
+      const { x, y } = this.getPlotPosition(row, col);
+      plot.image.setPosition(x, y).setDisplaySize(this.layout.plotWidth, this.layout.plotHeight);
+      plot.crop?.setPosition(x, y + 12);
+      plot.label?.setPosition(x + 14, y + 8);
+    });
+
+    this.lockedPlots.forEach((plot, plotId) => {
+      if (!plot) return;
+      const row = Math.floor(plotId / this.layout.cols);
+      const col = plotId % this.layout.cols;
+      const { x, y } = this.getPlotPosition(row, col);
+      plot.soil.setPosition(x, y).setDisplaySize(this.layout.plotWidth, this.layout.plotHeight);
+      plot.lockIcon?.setPosition(x, y + 1);
+      plot.lockShadow?.setPosition(x, y + 13);
+    });
+  }
+
+  setVisible(visible) {
+    const toggle = (object) => {
+      object?.setVisible(visible).setActive(visible);
+      if (object?.input) object.input.enabled = visible;
+    };
+    this.plots.forEach((plot) => {
+      toggle(plot.image);
+      toggle(plot.crop);
+      toggle(plot.label);
+    });
+    this.lockedPlots.forEach((plot) => {
+      toggle(plot?.soil);
+      toggle(plot?.lockIcon);
+      toggle(plot?.lockShadow);
+    });
+    if (!visible) {
+      this.closeSeedPopup();
+      this.closeConfirmPopup();
     }
   }
 

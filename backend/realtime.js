@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { t } from "./i18n.js";
 
+// Online rooms and battles are intentionally stored in server memory.
 const MAX_ROOM_PLAYERS = 8;
 const WIN_CARROT_COUNT = 3;
 const RESULT_DURATION_MS = 5000;
@@ -131,7 +132,7 @@ export function registerOnlineRooms(io) {
         || payload.crop !== "carrot"
         || !Number.isInteger(plotId)
         || plotId < 0
-        || plotId >= 8
+        || plotId >= 10
       ) {
         reply({ ok: false });
         return;

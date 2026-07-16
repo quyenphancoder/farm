@@ -11,13 +11,44 @@
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="/tailwind.css" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="game-app">
-      <section class="game-stage" aria-label="Nông trại Sunny Farm" data-i18n-aria-label="game.farmLabel">
+      <section class="game-stage input-locked" aria-label="Nông trại Sunny Farm" data-i18n-aria-label="game.farmLabel">
         <div id="game-container"></div>
         <div class="scene-vignette" aria-hidden="true"></div>
+
+        <div id="game-loading" class="game-loading" hidden aria-live="polite">
+          <div class="game-loading__mist"></div>
+          <section class="game-loading__panel">
+            <div class="game-loading__seal" aria-hidden="true"><span>☯</span></div>
+            <p class="game-loading__eyebrow" data-i18n="loading.eyebrow">LINH CẢNH ĐANG KHAI MỞ</p>
+            <h2 data-i18n="loading.title">Đang tiến vào linh điền</h2>
+            <div class="game-loading__track"><span id="game-loading-bar"></span></div>
+            <strong id="game-loading-percent">0%</strong>
+            <p id="game-loading-status" data-i18n="loading.gathering">Đang hội tụ linh khí…</p>
+          </section>
+        </div>
+
+        <div id="game-modal" class="game-modal absolute inset-0 z-[180] grid place-items-center p-5" hidden>
+          <button class="game-modal__backdrop absolute inset-0 border-0 bg-[#020d0acc] backdrop-blur-[5px]" type="button" aria-label="Close"></button>
+          <section class="game-modal__panel relative w-[min(420px,calc(100vw-32px))] max-h-[calc(100dvh-32px)] overflow-hidden rounded-[26px] border border-[#f8d56bbd] bg-[linear-gradient(145deg,#12352df7,#061713fc_72%)] px-6 py-6 text-center shadow-[0_0_0_1px_#79e7bd22,0_24px_80px_#000c,inset_0_1px_0_#fff3]" role="dialog" aria-modal="true" aria-labelledby="game-modal-title">
+            <span class="cultivation-seal cultivation-seal--left" aria-hidden="true"></span>
+            <span class="cultivation-seal cultivation-seal--right" aria-hidden="true"></span>
+            <div class="pointer-events-none absolute inset-[7px] rounded-[19px] border border-[#f6dc8126]"></div>
+            <div class="relative z-10">
+              <div class="mx-auto mb-3 grid size-10 place-items-center rounded-full border border-[#f8d56b99] bg-[#102d26] text-xl text-[#ffe99a] shadow-[0_0_18px_#e8bd4355]">☯</div>
+              <button id="game-modal-close" class="game-modal__close absolute -top-4 -right-2 grid size-9 place-items-center rounded-full border border-[#f8d56b55] bg-[#0a211bcc] text-2xl leading-none text-[#ffe9a6] transition hover:rotate-90 hover:bg-[#23483b]" type="button" aria-label="Close">×</button>
+              <h2 id="game-modal-title" class="mx-8 mb-2 font-cultivation text-2xl font-extrabold tracking-wide text-[#fff0b0] drop-shadow-[0_0_8px_#dcae4866]"></h2>
+              <p id="game-modal-subtitle" class="game-modal__subtitle mb-4 text-xs font-bold leading-relaxed text-[#a9cfc0]"></p>
+              <div class="mx-auto mb-4 h-px w-3/4 bg-gradient-to-r from-transparent via-[#f8d56b80] to-transparent"></div>
+              <div id="game-modal-content" class="game-modal__content grid max-h-[min(330px,48dvh)] gap-2 overflow-y-auto px-1 text-[#edf9f2]"></div>
+              <div id="game-modal-actions" class="game-modal__actions mt-5 flex justify-center gap-3"></div>
+            </div>
+          </section>
+        </div>
 
         <div id="start-screen" class="start-screen" role="dialog" aria-modal="true"
           aria-labelledby="start-title">
@@ -160,7 +191,10 @@
         <header class="top-hud">
           <div class="profile-panel">
             <div class="profile-card">
-              <span class="avatar"><img id="player-avatar" alt="Nông dân SunnyFarm" data-i18n-alt="game.avatarAlt" /></span>
+              <button class="avatar" type="button" onclick="toggleProfilePanel(this)"
+                aria-expanded="true" title="Thu gọn thông tin nhân vật">
+                <img id="player-avatar" alt="Nông dân SunnyFarm" data-i18n-alt="game.avatarAlt" />
+              </button>
               <span class="profile-copy">
                 <strong id="player-display">SunnyFarm</strong>
                 <small id="player-level" data-i18n="common.level" data-i18n-level="1">Cấp 1</small>
@@ -180,6 +214,13 @@
               <span class="resource-pill" data-i18n="common.loading">Đang tải…</span>
             </div>
 
+            <button class="profile-mission-button" type="button"
+              hx-get="/api/game/quests" hx-target="#drawer-content"
+              hx-on:click="openDrawer('popup')">
+              <span aria-hidden="true">📜</span>
+              <small data-i18n="nav.quests">Nhiệm vụ</small>
+            </button>
+
             <section id="battle-hud" class="battle-hud" hidden>
               <strong data-i18n="online.battleGoal">Thu hoạch 3 carrot để chiến thắng!</strong>
               <div id="battle-progress-list"></div>
@@ -189,12 +230,6 @@
           <nav class="top-actions" aria-label="Tính năng" data-i18n-aria-label="nav.features">
             <button class="quick-action" type="button" hx-get="/api/game/events" hx-target="#drawer-content"
               hx-on:click="openDrawer('popup')"><span>🎁</span><small data-i18n="nav.events">Sự kiện</small><b>3</b></button>
-            <button class="quick-action" type="button" hx-get="/api/game/quests" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>📜</span><small data-i18n="nav.quests">Nhiệm vụ</small></button>
-            <button class="quick-action" type="button" hx-get="/api/shop" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🏪</span><small data-i18n="nav.shop">Cửa hàng</small></button>
-            <button class="quick-action" type="button" hx-get="/api/game/inventory" hx-target="#drawer-content"
-              hx-on:click="openDrawer('popup')"><span>🎒</span><small data-i18n="nav.inventory">Kho đồ</small></button>
             <button class="quick-action" type="button" hx-get="/api/game/map" hx-target="#drawer-content"
               hx-on:click="openDrawer('popup')"><span>🗺️</span><small data-i18n="nav.map">Bản đồ</small></button>
             <button class="menu-button" type="button" aria-label="Mở menu" aria-expanded="false"
@@ -285,11 +320,21 @@
       let currentPlayerName = "";
       let currentUserId = "";
       let gameHasStarted = false;
+      window.gameInputEnabled = false;
       let currentUserInitialized = false;
+      let enterGameTimer = null;
+      let gameModalOnClose = null;
+      let gameModalTimer = null;
+      let gameLoadingProgress = 0;
       let authMode = "login";
       let onlineSocket = null;
       let onlineRoomId = null;
       let selectedPrivateListingId = null;
+
+      document.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+      });
+
       const onlinePlayerKey = sessionStorage.getItem("onlinePlayerKey")
         || crypto.randomUUID();
       sessionStorage.setItem("onlinePlayerKey", onlinePlayerKey);
@@ -377,37 +422,147 @@
         location.reload();
       }
 
-      function enterGame(name) {
+      function enterGame(name, waitForScene = true) {
         document.getElementById("player-display").textContent = name;
         const startScreen = document.getElementById("start-screen");
-        startScreen.classList.add("leaving");
-        setGameInputEnabled(true);
-        setTimeout(() => {
+        setGameInputEnabled(false);
+        startScreen.classList.add("is-loading");
+        window.clearTimeout(enterGameTimer);
+        showGameLoading();
+        requestAnimationFrame(() => startScreen.classList.add("leaving"));
+        enterGameTimer = window.setTimeout(() => {
           startScreen.hidden = true;
-          startScreen.classList.remove("leaving");
-          focusGameInput();
-        }, 260);
+          startScreen.classList.remove("leaving", "is-loading");
+        }, 650);
         if (!gameHasStarted) {
           gameHasStarted = true;
           resolveFarmGame();
+        } else if (!waitForScene) {
+          updateGameLoading(94, tr("loading.stabilizing"));
+          window.setTimeout(finishGameLoading, 700);
         }
       }
 
+      function showGameLoading() {
+        const loading = document.getElementById("game-loading");
+        gameLoadingProgress = 0;
+        updateGameLoading(0, tr("loading.gathering"));
+        loading.hidden = false;
+        loading.classList.remove("leaving");
+        requestAnimationFrame(() => loading.classList.add("visible"));
+      }
+
+      function updateGameLoading(progress, status) {
+        gameLoadingProgress = Math.max(gameLoadingProgress, Math.min(100, Math.round(progress)));
+        document.getElementById("game-loading-bar").style.width = `${gameLoadingProgress}%`;
+        document.getElementById("game-loading-percent").textContent = `${gameLoadingProgress}%`;
+        if (status) document.getElementById("game-loading-status").textContent = status;
+      }
+
+      function finishGameLoading() {
+        const loading = document.getElementById("game-loading");
+        if (loading.hidden) return;
+        updateGameLoading(100, tr("loading.ready"));
+        window.setTimeout(() => {
+          loading.classList.add("leaving");
+          window.setTimeout(() => {
+            loading.hidden = true;
+            loading.classList.remove("visible", "leaving");
+            setGameInputEnabled(true);
+            focusGameInput();
+          }, 700);
+        }, 350);
+      }
+
+      function closeGameModal(notify = true) {
+        const modal = document.getElementById("game-modal");
+        if (modal.hidden) return;
+        window.clearTimeout(gameModalTimer);
+        gameModalTimer = null;
+        modal.hidden = true;
+        modal.classList.remove("passive");
+        const onClose = gameModalOnClose;
+        gameModalOnClose = null;
+        document.getElementById("game-modal-content").replaceChildren();
+        document.getElementById("game-modal-actions").replaceChildren();
+        if (notify) onClose?.();
+        setGameInputEnabled(true);
+      }
+
+      function openGameModal({
+        title = "",
+        subtitle = "",
+        content = null,
+        actions = [],
+        onClose = null,
+        passive = false,
+        dismissAfter = 0
+      }) {
+        closeGameModal(false);
+        const modal = document.getElementById("game-modal");
+        const titleElement = document.getElementById("game-modal-title");
+        titleElement.textContent = title;
+        titleElement.hidden = !title;
+        const subtitleElement = document.getElementById("game-modal-subtitle");
+        subtitleElement.textContent = subtitle;
+        subtitleElement.hidden = !subtitle;
+        const contentElement = document.getElementById("game-modal-content");
+        if (content instanceof Node) contentElement.replaceChildren(content);
+        else contentElement.textContent = content || "";
+        const actionsElement = document.getElementById("game-modal-actions");
+        actionsElement.replaceChildren(...actions.map((action) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = action.primary
+            ? "game-modal__button min-w-28 rounded-xl border border-[#ffe28a99] bg-[linear-gradient(180deg,#689c55,#356644)] px-4 py-2.5 font-black text-[#fff9dc] shadow-[0_4px_0_#183622,0_0_18px_#80d59624] transition hover:-translate-y-0.5 hover:brightness-110"
+            : "game-modal__button min-w-28 rounded-xl border border-[#f8d56b55] bg-[#203b31] px-4 py-2.5 font-black text-[#dcece3] shadow-[0_4px_0_#0b2118] transition hover:-translate-y-0.5 hover:brightness-125";
+          button.textContent = action.label;
+          button.addEventListener("click", () => {
+            if (action.close !== false) closeGameModal(false);
+            action.onClick?.();
+          });
+          return button;
+        }));
+        gameModalOnClose = onClose;
+        modal.classList.toggle("passive", passive);
+        modal.hidden = false;
+        if (!passive) {
+          setGameInputEnabled(false);
+          requestAnimationFrame(() => actionsElement.querySelector("button")?.focus());
+        }
+        if (dismissAfter > 0) {
+          gameModalTimer = window.setTimeout(() => closeGameModal(false), dismissAfter);
+        }
+      }
+
+      window.openGameModal = openGameModal;
+      window.closeGameModal = closeGameModal;
+      document.getElementById("game-modal-close").addEventListener("click", () => closeGameModal());
+      document.querySelector(".game-modal__backdrop").addEventListener("click", () => closeGameModal());
+
       function continueGame() {
-        enterGame(currentPlayerName);
+        enterGame(currentPlayerName, !gameHasStarted);
       }
 
       function returnToMenu() {
+        window.clearTimeout(enterGameTimer);
+        enterGameTimer = null;
+        const loading = document.getElementById("game-loading");
+        loading.hidden = true;
+        loading.classList.remove("visible", "leaving");
         closeDrawer();
         closeQuickMenu();
         setGameInputEnabled(false);
+        const farmScene = window.farmGame?.scene.getScene("FarmScene");
+        farmScene?.crops?.closeSeedPopup();
+        farmScene?.crops?.closeConfirmPopup();
         document.getElementById("new-game-form").hidden = true;
         document.getElementById("online-menu").hidden = true;
         document.getElementById("online-room").hidden = true;
         document.getElementById("auth-panel").hidden = true;
         document.getElementById("start-choices").hidden = false;
         const startScreen = document.getElementById("start-screen");
-        startScreen.classList.remove("leaving");
+        startScreen.classList.remove("leaving", "is-loading");
         startScreen.hidden = false;
       }
 
@@ -816,7 +971,14 @@
           submitButton.disabled = false;
           submitButton.textContent = tr("restart.confirm");
           document.body.dispatchEvent(new CustomEvent("farm:changed"));
+          const shouldRestartFarm = Boolean(window.farmGame);
           enterGame(result.name);
+          if (shouldRestartFarm) {
+            setTimeout(() => {
+              const farmScene = window.farmGame?.scene.getScene("FarmScene");
+              if (farmScene) farmScene.scene.restart();
+            }, 260);
+          }
         } catch (error) {
           errorBox.textContent = error.message;
           submitButton.disabled = false;
@@ -832,17 +994,82 @@
         setGameInputEnabled(false);
         closeQuickMenu();
       }
+      function loadDrawerContent(url) {
+        document.getElementById("drawer-content").innerHTML =
+          `<div class="drawer-loading">${tr("common.loading")}</div>`;
+        htmx.ajax("GET", url, { target: "#drawer-content", swap: "innerHTML" });
+      }
+      function openShop() {
+        openDrawer("popup");
+        loadDrawerContent("/api/shop");
+      }
+      function openInventory() {
+        openDrawer("popup");
+        if (!window.onlineBattleState?.active) {
+          loadDrawerContent("/api/game/inventory");
+          return;
+        }
+
+        const farmScene = window.farmGame?.scene.getScene("FarmScene");
+        const counts = farmScene?.crops?.inventoryCounts || new Map();
+        const items = [
+          {
+            name: tr("item.carrotSeed"),
+            icon: "🌱",
+            quantity: counts.get("carrot_seed") || 0
+          },
+          {
+            name: tr("item.water"),
+            icon: "💧",
+            quantity: counts.get("water") || 0
+          }
+        ].filter((item) => item.quantity > 0);
+        const totalSlots = 12;
+        const occupiedSlots = items.map((item) => `
+          <div class="inventory-slot filled" title="${item.name}">
+            <span class="slot-icon">${item.icon}</span>
+            <small class="slot-name">${item.name}</small>
+            <b class="slot-quantity">${item.quantity}</b>
+          </div>
+        `);
+        const emptySlots = Array.from(
+          { length: totalSlots - occupiedSlots.length },
+          () => `<div class="inventory-slot empty" aria-label="${tr("inventory.empty")}"></div>`
+        );
+        document.getElementById("drawer-content").innerHTML = `
+          <section class="inventory-panel">
+            <h2 class="drawer-title">${tr("inventory.title")}</h2>
+            <p class="drawer-subtitle">${tr("online.battleInventory")}</p>
+            <p class="drawer-subtitle">${tr("inventory.usage", {
+              used: occupiedSlots.length,
+              total: totalSlots
+            })}</p>
+            <div class="inventory-grid">${occupiedSlots.join("")}${emptySlots.join("")}</div>
+          </section>
+        `;
+      }
       function closeDrawer() {
         document.getElementById("game-drawer").classList.remove("open");
         document.getElementById("drawer-backdrop").classList.remove("open");
-        setGameInputEnabled(true);
+        setTimeout(() => setGameInputEnabled(true), 300);
       }
       function setGameInputEnabled(enabled) {
-        window.gameInputEnabled = enabled;
+        const startScreen = document.getElementById("start-screen");
+        const battleResult = document.getElementById("battle-result");
+        const drawerBackdrop = document.getElementById("drawer-backdrop");
+        const gameModal = document.getElementById("game-modal");
+        const blocked = !startScreen.hidden
+          || !battleResult.hidden
+          || !document.getElementById("game-loading").hidden
+          || (!gameModal.hidden && !gameModal.classList.contains("passive"))
+          || drawerBackdrop.classList.contains("open");
+        const inputEnabled = Boolean(enabled) && !blocked;
+        window.gameInputEnabled = inputEnabled;
+        document.querySelector(".game-stage").classList.toggle("input-locked", !inputEnabled);
         window.farmGame?.scene.getScenes(true).forEach((scene) => {
           if (!scene.input) return;
-          scene.input.enabled = enabled;
-          if (scene.input.keyboard) scene.input.keyboard.enabled = enabled;
+          scene.input.enabled = inputEnabled;
+          if (scene.input.keyboard) scene.input.keyboard.enabled = inputEnabled;
         });
       }
       function focusGameInput() {
@@ -856,9 +1083,10 @@
       document.getElementById("game-container").addEventListener("pointerdown", () => {
         focusGameInput();
       });
-      document.body.addEventListener("game:scene-ready", () => {
-        focusGameInput();
+      document.body.addEventListener("game:loading-progress", (event) => {
+        updateGameLoading(event.detail?.progress || 0, event.detail?.status);
       });
+      document.body.addEventListener("game:scene-ready", finishGameLoading);
       window.addEventListener("focus", () => {
         if (document.getElementById("start-screen").hidden
           && document.getElementById("battle-result").hidden) {
@@ -877,6 +1105,15 @@
         menu.classList.remove("open");
         button.setAttribute("aria-expanded", "false");
         button.setAttribute("aria-label", tr("nav.openMenu"));
+      }
+      function toggleProfilePanel(avatarButton) {
+        const panel = avatarButton.closest(".profile-panel");
+        const collapsed = panel.classList.toggle("collapsed");
+        avatarButton.setAttribute("aria-expanded", String(!collapsed));
+        avatarButton.setAttribute(
+          "title",
+          collapsed ? "Mở thông tin nhân vật" : "Thu gọn thông tin nhân vật"
+        );
       }
       function selectShopItem(button) {
         document.querySelectorAll(".shop-product").forEach((item) =>

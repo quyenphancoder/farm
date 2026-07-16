@@ -23,18 +23,7 @@ export default class Player {
     this.moveSpeed = 190;
     this.arrivalRadius = 3;
 
-    this.marker = scene.add.circle(x, y, 13, 0xffe787, .22)
-      .setStrokeStyle(3, 0xfff2a8, .9)
-      .setDepth(19)
-      .setVisible(false);
-    scene.tweens.add({
-      targets: this.marker,
-      scale: 1.35,
-      alpha: .28,
-      duration: 550,
-      yoyo: true,
-      repeat: -1
-    });
+    this.marker = this.createMoveMarker(x, y);
 
     scene.input.mouse.disableContextMenu();
     scene.input.on("pointerdown", (pointer) => {
@@ -47,6 +36,56 @@ export default class Player {
     });
   }
 
+  createMoveMarker(x, y) {
+    const glow = this.scene.add.circle(0, 0, 14, 0x4edfff, .12)
+      .setStrokeStyle(1, 0xa9f5ff, .35);
+    const outerRing = this.scene.add.graphics();
+
+    outerRing.lineStyle(2.2, 0x75eaff, .95);
+    for (let index = 0; index < 4; index += 1) {
+      outerRing.beginPath();
+      outerRing.arc(0, 0, 16, index * Math.PI / 2 + .13, index * Math.PI / 2 + 1.13);
+      outerRing.strokePath();
+    }
+    outerRing.lineStyle(1.2, 0xffffff, .55);
+    outerRing.strokeCircle(0, 0, 12);
+
+    const marker = this.scene.add.container(x, y, [glow, outerRing])
+      .setDepth(19)
+      .setVisible(false);
+    marker.glow = glow;
+    marker.outerRing = outerRing;
+
+    this.scene.tweens.add({
+      targets: outerRing,
+      angle: 360,
+      duration: 2200,
+      repeat: -1
+    });
+    this.scene.tweens.add({
+      targets: glow,
+      scale: 1.35,
+      alpha: .18,
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+    return marker;
+  }
+
+  showMoveMarker(x, y) {
+    this.marker.setPosition(x, y).setVisible(true).setScale(.55).setAlpha(0);
+    this.scene.tweens.killTweensOf(this.marker);
+    this.scene.tweens.add({
+      targets: this.marker,
+      scale: 1,
+      alpha: 1,
+      duration: 150,
+      ease: "Back.easeOut"
+    });
+  }
+
   createAnimations() {
     for (const direction of ["down", "up", "left", "right"]) {
       const key = `farmer-walk-${direction}`;
@@ -54,9 +93,7 @@ export default class Player {
       const sequence = [1, 2, 3, 4];
       this.scene.anims.create({
         key,
-        frames: sequence.map((index) => ({
-          key: `farmer-${direction}-${index}`
-        })),
+        frames: sequence.map((index) => ({ key: `farmer-${direction}-${index}` })),
         frameRate: 5,
         repeat: -1
       });
@@ -88,7 +125,7 @@ export default class Player {
       this.cancelMove();
       this.moveByKeyboard(keyboardX, keyboardY);
     } else if (this.moveTarget) {
-      this.moveTowardTarget(delta);
+      this.moveTowardTarget();
     } else {
       this.sprite.setVelocity(0);
     }
@@ -105,13 +142,13 @@ export default class Player {
     );
   }
 
-  moveTowardTarget(delta) {
+  moveTowardTarget() {
     const deltaX = this.moveTarget.x - this.sprite.x;
     const deltaY = this.moveTarget.y - this.sprite.y;
     const distance = Math.hypot(deltaX, deltaY);
-    const step = this.moveSpeed * (delta / 1000);
+    const arrivalDistance = Math.max(this.arrivalRadius, this.moveSpeed / 60 * 1.5);
 
-    if (distance <= Math.max(this.arrivalRadius, step)) {
+    if (distance <= arrivalDistance) {
       this.sprite.setPosition(this.moveTarget.x, this.moveTarget.y);
       this.sprite.setVelocity(0);
       this.cancelMove();
@@ -210,14 +247,17 @@ export default class Player {
   moveTo(x, y) {
     if (this.scene.time.now < this.actionUntil) return;
     const bounds = this.scene.physics.world.bounds;
-    const targetX = Phaser.Math.Clamp(x, bounds.left + 16, bounds.right - 16);
-    const targetY = Phaser.Math.Clamp(y, bounds.top + 16, bounds.bottom - 16);
+    const resolvedTarget = this.scene.resolveMoveTarget?.(x, y);
+    const targetX = resolvedTarget?.x
+      ?? Phaser.Math.Clamp(x, bounds.left + 16, bounds.right - 16);
+    const targetY = resolvedTarget?.y
+      ?? Phaser.Math.Clamp(y, bounds.top + 16, bounds.bottom - 16);
 
     this.moveTarget = {
       x: targetX,
       y: targetY
     };
-    this.marker.setPosition(targetX, targetY).setVisible(true);
+    this.showMoveMarker(targetX, targetY);
   }
 
   cancelMove() {

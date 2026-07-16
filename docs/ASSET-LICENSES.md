@@ -1,5 +1,7 @@
 # Asset licenses
 
+Asset paths below are relative to `public/assets/`.
+
 ## User-provided artwork
 
 - `characters/sprites/`

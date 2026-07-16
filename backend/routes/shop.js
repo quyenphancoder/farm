@@ -2,6 +2,7 @@ import { Router } from "express";
 import { runTransaction } from "./transaction.js";
 import { t } from "../i18n.js";
 
+// Persistent shop routes.
 const router = Router();
 
 router.get("/", (req, res) => {
@@ -43,6 +44,18 @@ router.get("/", (req, res) => {
           <strong>${text("item.pesticide")}</strong>
           <small>${text("shop.perBottle")}</small>
         </button>
+        <button class="shop-product" type="button" data-name="${text("item.chicken")}"
+          data-item="chicken" data-price="120" onclick="selectShopItem(this)">
+          <span class="product-icon">🐔</span>
+          <strong>${text("item.chicken")}</strong>
+          <small>${text("shop.perChicken")}</small>
+        </button>
+        <button class="shop-product" type="button" data-name="${text("item.duck")}"
+          data-item="duck" data-price="140" onclick="selectShopItem(this)">
+          <span class="product-icon">🦆</span>
+          <strong>${text("item.duck")}</strong>
+          <small>${text("shop.perDuck")}</small>
+        </button>
         ${cornProduct}
         <button class="shop-product" type="button" disabled>
           <span class="product-lock">🔒</span>
@@ -83,7 +96,9 @@ router.post("/buy", (req, res) => {
   const products = {
     carrot_seed: { price: 2, name: t(req.language, "item.carrotSeed"), unlockLevel: 1 },
     corn_seed: { price: 4, name: t(req.language, "item.cornSeed"), unlockLevel: 2 },
-    pesticide: { price: 5, name: t(req.language, "item.pesticide"), unlockLevel: 1 }
+    pesticide: { price: 5, name: t(req.language, "item.pesticide"), unlockLevel: 1 },
+    chicken: { price: 120, name: t(req.language, "item.chicken"), unlockLevel: 1 },
+    duck: { price: 140, name: t(req.language, "item.duck"), unlockLevel: 1 }
   };
   const product = products[item];
 

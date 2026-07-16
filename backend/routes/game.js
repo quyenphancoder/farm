@@ -2,11 +2,12 @@ import { Router } from "express";
 import { runTransaction } from "./transaction.js";
 import { t } from "../i18n.js";
 
+// Persistent solo-game routes.
 const router = Router();
 const LAND_UNLOCK_COST = 50;
-const TOTAL_PLOTS = 40;
+const TOTAL_PLOTS = 50;
 const CROP_GROWTH_MS = 10000;
-const WATER_COLLECTION_MS = 10000;
+const WATER_COLLECTION_MS = 3000;
 const HARVEST_XP = 10;
 const XP_PER_LEVEL = 100;
 const SELL_PRICES = {
@@ -283,10 +284,10 @@ router.get("/hud", (req, res) => {
 
   res.send(`
     <span class="resource-pill">
-      <span class="resource-icon">🪙</span><strong>${player.coins.toLocaleString(req.language === "en" ? "en-US" : "vi-VN")}</strong><em>+</em>
+      <span class="resource-icon"><img src="/assets/tiles/gold.png" alt="" aria-hidden="true"></span><strong>${player.coins.toLocaleString(req.language === "en" ? "en-US" : "vi-VN")}</strong>
     </span>
     <span class="resource-pill">
-      <span class="resource-icon">💎</span><strong>${player.diamonds.toLocaleString(req.language === "en" ? "en-US" : "vi-VN")}</strong><em>+</em>
+      <span class="resource-icon"><img src="/assets/tiles/diamond.png" alt="" aria-hidden="true"></span><strong>${player.diamonds.toLocaleString(req.language === "en" ? "en-US" : "vi-VN")}</strong>
     </span>
   `);
 });
@@ -302,7 +303,9 @@ router.get("/inventory", (req, res) => {
     carrot: { name: t(req.language, "item.carrot"), icon: "🥕", sellPrice: SELL_PRICES.carrot },
     corn: { name: t(req.language, "item.corn"), icon: "🌽", sellPrice: SELL_PRICES.corn },
     water: { name: t(req.language, "item.water"), icon: "💧" },
-    pesticide: { name: t(req.language, "item.pesticide"), icon: "🧴" }
+    pesticide: { name: t(req.language, "item.pesticide"), icon: "🧴" },
+    chicken: { name: t(req.language, "item.chicken"), icon: "🐔" },
+    duck: { name: t(req.language, "item.duck"), icon: "🦆" }
   };
   const occupiedSlots = items.map((item) => {
     const info = meta[item.item] || { name: item.item, icon: "📦" };

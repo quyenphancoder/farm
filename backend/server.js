@@ -13,6 +13,7 @@ import { languageMiddleware } from "./i18n.js";
 import { getSocketUser, requestContext, requireAuth } from "./routes/auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, "..");
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -23,7 +24,7 @@ const io = new Server(httpServer, {
 });
 const port = process.env.PORT || 3000;
 
-const db = new DatabaseSync(path.join(__dirname, "database.sqlite"));
+const db = new DatabaseSync(path.join(projectRoot, "database.sqlite"));
 db.function("current_player_id", () => {
   const playerId = requestContext.getStore()?.playerId;
   if (!playerId) throw new Error("Missing authenticated player context");
@@ -97,7 +98,7 @@ app.locals.db = db;
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(languageMiddleware);
-app.use(express.static(path.join(__dirname, "public"), {
+app.use(express.static(path.join(projectRoot, "public"), {
   etag: false,
   maxAge: 0,
   setHeaders(res) {
@@ -140,22 +141,33 @@ function ensureFarmStateColumn(db, name, definition) {
 
 function migratePlotGrid(db) {
   const version = db.prepare("PRAGMA user_version").get().user_version;
-  if (version >= 1) return;
+  if (version >= 2) return;
 
   db.exec("BEGIN IMMEDIATE");
   try {
-    for (const table of ["farm_state", "unlocked_plots"]) {
-      db.exec(`
-        UPDATE ${table}
-        SET plot_id = 1000 + CAST(plot_id / 5 AS INTEGER) * 8 + (plot_id % 5)
-        WHERE plot_id BETWEEN 0 AND 19;
+    if (version < 1) {
+      for (const table of ["farm_state", "unlocked_plots"]) {
+        db.exec(`
+          UPDATE ${table}
+          SET plot_id = 1000 + CAST(plot_id / 5 AS INTEGER) * 8 + (plot_id % 5)
+          WHERE plot_id BETWEEN 0 AND 19;
 
-        UPDATE ${table}
-        SET plot_id = plot_id - 1000
-        WHERE plot_id >= 1000;
+          UPDATE ${table}
+          SET plot_id = plot_id - 1000
+          WHERE plot_id >= 1000;
+        `);
+      }
+    }
+    if (version < 2) {
+      db.exec(`
+        INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id)
+        SELECT id, 8 FROM players WHERE is_initialized = 1;
+
+        INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id)
+        SELECT id, 9 FROM players WHERE is_initialized = 1;
       `);
     }
-    db.exec("PRAGMA user_version = 1");
+    db.exec("PRAGMA user_version = 2");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

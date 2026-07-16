@@ -4,6 +4,7 @@ import { Router } from "express";
 import { runTransaction } from "./transaction.js";
 import { t } from "../i18n.js";
 
+// Authentication, sessions, and new-game initialization routes.
 const router = Router();
 const SESSION_COOKIE = "sunnyfarm_session";
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -113,7 +114,7 @@ router.post("/new-game", requireAuth, (req, res) => {
       WHERE id = ?
     `).run(name, playerId);
     db.prepare("UPDATE users SET display_name = ? WHERE id = ?").run(name, playerId);
-    for (let plotId = 0; plotId < 8; plotId += 1) {
+    for (let plotId = 0; plotId < 10; plotId += 1) {
       db.prepare("INSERT INTO unlocked_plots (player_id, plot_id) VALUES (?, ?)")
         .run(playerId, plotId);
     }
