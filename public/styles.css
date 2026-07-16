@@ -307,9 +307,9 @@ button { color: inherit; }
     max(20px, env(safe-area-inset-left));
   place-items: center;
   background:
-    radial-gradient(circle at 50% 32%, rgba(123, 188, 86, .28), transparent 38%),
-    rgba(5, 22, 15, .78);
-  backdrop-filter: blur(8px);
+    radial-gradient(circle at 50% 38%, transparent 20%, rgba(2, 16, 18, .28) 72%),
+    linear-gradient(rgba(3, 19, 20, .18), rgba(2, 14, 15, .42)),
+    url("/assets/tiles/welcome.png") center / cover no-repeat;
   opacity: 1;
   transition: opacity .65s ease;
 }
@@ -553,6 +553,15 @@ button { color: inherit; }
   color: #ffe29a;
   font: 800 clamp(28px, 3.2vw, 38px)/1 "Baloo 2", sans-serif;
   text-shadow: 0 3px 0 #66451f;
+}
+
+.start-english-title {
+  margin: 5px 0 0;
+  color: #f5d98c;
+  font: 800 clamp(10px, 1.05vw, 13px)/1.2 "Nunito", sans-serif;
+  letter-spacing: .18em;
+  text-shadow: 0 2px 5px #0008;
+  text-transform: uppercase;
 }
 
 .start-message {

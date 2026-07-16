@@ -1,6 +1,6 @@
-# 🌱 Sunny Farm
+# 🌱 Linh Điền Ký
 
-Sunny Farm is a browser-based farming game. Players can control a character, grow and care for crops, harvest produce, manage resources, and expand their farm.
+Linh Điền Ký is a browser-based cultivation farming game. Players can control a character, grow and care for crops, harvest produce, manage resources, and expand their spirit fields.
 
 The game supports two modes:
 
