@@ -401,6 +401,67 @@ button { color: inherit; }
 @keyframes loading-mist { from { transform: translateX(-8%) scale(.9); } to { transform: translateX(8%) scale(1.12); } }
 
 .game-modal[hidden] { display: none; }
+.game-modal__backdrop {
+  background: rgba(0, 17, 26, .62) !important;
+  backdrop-filter: blur(6px) saturate(1.12);
+}
+.game-modal__panel {
+  border-color: rgba(190, 244, 247, .66) !important;
+  background:
+    linear-gradient(150deg, rgba(220, 255, 251, .16), transparent 34%),
+    linear-gradient(145deg, rgba(9, 70, 73, .94), rgba(3, 30, 42, .97)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .58),
+    inset 0 -1px 0 rgba(255, 220, 124, .25),
+    0 0 0 4px rgba(82, 221, 218, .08),
+    0 25px 80px rgba(0, 8, 18, .72),
+    0 0 38px rgba(56, 230, 224, .2) !important;
+  backdrop-filter: blur(18px) saturate(1.22);
+}
+.game-modal__panel .relative.z-10 > div:first-child {
+  border-color: rgba(255, 230, 145, .78) !important;
+  background: radial-gradient(circle, rgba(151, 247, 237, .42), rgba(10, 78, 83, .92)) !important;
+  color: #fff0a8 !important;
+  box-shadow: 0 0 0 4px rgba(80, 224, 218, .1), 0 0 21px rgba(82, 235, 232, .5), inset 0 1px 5px #ffffff55 !important;
+}
+.game-modal__close {
+  border-color: rgba(184, 240, 241, .42) !important;
+  background: linear-gradient(rgba(34, 110, 110, .82), rgba(5, 48, 60, .9)) !important;
+  color: #fff0ae !important;
+  box-shadow: inset 0 1px 0 #ffffff33, 0 4px 12px #00131c88;
+}
+.game-modal__close:hover { background: #227c7c !important; box-shadow: 0 0 14px #61ebe366; }
+#game-modal-title { color: #fff0ae !important; text-shadow: 0 2px 0 #655127, 0 0 15px #ffe18455; }
+#game-modal-subtitle { color: #bce8e2 !important; }
+.game-modal__content { color: #effffc !important; }
+#game-modal-remote-content { width: 100%; }
+#game-modal-remote-content .drawer-title,
+#game-modal-content > .inventory-panel .drawer-title { margin-top: 0; }
+.game-modal__choice {
+  border-color: rgba(177, 237, 239, .3) !important;
+  background: linear-gradient(90deg, rgba(26, 99, 96, .72), rgba(5, 48, 61, .82)) !important;
+  box-shadow: inset 0 1px 0 #ffffff28, 0 3px 8px #00151f55 !important;
+}
+.game-modal__choice:hover:not(:disabled) {
+  border-color: rgba(255, 228, 140, .74) !important;
+  box-shadow: inset 0 1px 0 #ffffff44, 0 0 17px #5be6dd33 !important;
+}
+.game-modal__price { color: #ffe7a0; }
+.game-modal__button {
+  border-color: rgba(184, 240, 241, .4) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(52, 137, 130, .88), rgba(8, 66, 75, .94)) !important;
+  color: #effffa !important;
+  box-shadow: inset 0 1px 0 #ffffff45, 0 5px 0 #042d36, 0 7px 16px #00131d77 !important;
+}
+.game-modal__button:hover { filter: brightness(1.14); box-shadow: inset 0 1px 0 #ffffff66, 0 5px 0 #042d36, 0 0 18px #62eee555 !important; }
+.game-modal__button:first-child:last-child,
+.game-modal__button:last-child:not(:first-child) {
+  border-color: rgba(255, 232, 151, .72) !important;
+  background: linear-gradient(180deg, #efd47d, #bc8536) !important;
+  color: #39270f !important;
+  box-shadow: inset 0 1px 0 #fffbd1, 0 5px 0 #62421c, 0 8px 18px #00131d77 !important;
+}
 .game-modal.passive { pointer-events: none; }
 .game-modal.passive .game-modal__backdrop,
 .game-modal.passive .game-modal__close,
@@ -479,10 +540,8 @@ button { color: inherit; }
 .farm-layout-editor button:hover { filter: brightness(1.2); }
 .game-modal__choice small { color: #ffe27b; }
 .game-modal__price { color: #fff1b8; font-size: 15px; font-weight: 900; }
-.game-modal__content { scrollbar-color: rgba(248, 213, 107, .5) transparent; scrollbar-width: thin; }
-.game-modal__content::-webkit-scrollbar { width: 5px; }
-.game-modal__content::-webkit-scrollbar-track { background: transparent; }
-.game-modal__content::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(248, 213, 107, .45); }
+.game-modal__content { scrollbar-width: none; }
+.game-modal__content::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 @media (max-height: 520px) {
   .game-modal__panel { padding-top: 14px !important; padding-bottom: 14px !important; }
@@ -1365,7 +1424,8 @@ button { color: inherit; }
   inset: 0;
   visibility: hidden;
   pointer-events: none;
-  background: rgba(5, 16, 11, .35);
+  background: rgba(0, 17, 26, .5);
+  backdrop-filter: blur(5px) saturate(1.12);
   opacity: 0;
   transition: .25s ease;
 }
@@ -1380,9 +1440,12 @@ button { color: inherit; }
   width: min(390px, 86%);
   height: 100%;
   padding: clamp(24px, 3vw, 42px);
-  border-left: 2px solid #f9d88466;
-  background: linear-gradient(145deg, rgba(33, 56, 43, .98), rgba(13, 27, 20, .98));
-  box-shadow: -18px 0 50px #0007;
+  border-left: 1px solid rgba(191, 244, 247, .62);
+  background:
+    linear-gradient(150deg, rgba(220, 255, 251, .14), transparent 32%),
+    linear-gradient(145deg, rgba(9, 70, 73, .95), rgba(3, 29, 41, .98));
+  box-shadow: inset 1px 0 0 #ffffff45, -18px 0 50px #00121bbb, 0 0 32px #4de6dc22;
+  backdrop-filter: blur(17px) saturate(1.2);
   transform: translateX(104%);
   transition: transform .28s cubic-bezier(.2, .8, .2, 1);
 }
@@ -1396,8 +1459,9 @@ button { color: inherit; }
   max-height: 92%;
   overflow: hidden;
   padding: clamp(18px, 2.3vw, 30px);
-  border: 2px solid #f9d88477;
-  border-radius: 22px;
+  border: 1px solid rgba(191, 244, 247, .66);
+  border-radius: 26px;
+  box-shadow: inset 0 1px 0 #ffffff77, 0 0 0 4px #52ddd914, 0 22px 70px #00101ccc, 0 0 32px #46e5dc2b;
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
@@ -1415,10 +1479,10 @@ button { color: inherit; }
     opacity .2s ease,
     visibility 0s linear 0s;
 }
-.drawer-close { position: absolute; top: 12px; right: 15px; border: 0; background: transparent; color: #ffe6a0; font-size: 34px; cursor: pointer; }
-.drawer-loading { padding-top: 40px; color: #c9d7c6; }
-.drawer-title { margin: 0 0 4px; color: #ffe19a; font: 800 24px/1.15 "Baloo 2", sans-serif; }
-.drawer-subtitle { margin: 0 0 14px; color: #b9ccbc; font-size: 12px; line-height: 1.4; }
+.drawer-close { position: absolute; top: 12px; right: 15px; border: 0; background: transparent; color: #ffe6a0; font-size: 34px; text-shadow: 0 0 12px #65eee477; cursor: pointer; }
+.drawer-loading { padding-top: 40px; color: #bde8e2; }
+.drawer-title { margin: 0 0 4px; color: #fff0ae; font: 800 24px/1.15 "Baloo 2", sans-serif; text-shadow: 0 2px 0 #645026, 0 0 14px #ffe18444; }
+.drawer-subtitle { margin: 0 0 14px; color: #bce4df; font-size: 12px; line-height: 1.4; }
 .sea-blocker-editor {
   position: fixed;
   z-index: 260;
@@ -1526,17 +1590,17 @@ button { color: inherit; }
   min-height: 88px;
   padding: 7px;
   place-items: center;
-  border: 2px solid rgba(255, 222, 142, .23);
+  border: 1px solid rgba(181, 239, 241, .3);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(65, 81, 54, .88), rgba(22, 37, 28, .94));
-  box-shadow: inset 0 2px 0 #ffffff12, 0 3px 0 #09170f99;
+  background: linear-gradient(145deg, rgba(38, 116, 111, .7), rgba(5, 48, 61, .88));
+  box-shadow: inset 0 1px 0 #ffffff35, 0 4px 9px #00151f66;
   cursor: pointer;
   transition: border-color .15s ease, filter .15s ease;
 }
-.shop-product:hover { filter: brightness(1.12); }
+.shop-product:hover { border-color: #ffe39b99; filter: brightness(1.12); box-shadow: inset 0 1px 0 #ffffff55, 0 0 15px #5ce9df44; }
 .shop-product.selected {
-  border-color: #bcea61;
-  box-shadow: inset 0 0 0 2px #87b63c66, 0 3px 0 #09170f99;
+  border-color: #ffe29a;
+  box-shadow: inset 0 0 0 1px #ffe29a55, 0 0 17px #61e9df55;
 }
 .shop-product:disabled { cursor: not-allowed; filter: grayscale(.45); opacity: .53; }
 .shop-product .product-icon { font-size: 31px; line-height: 1; filter: drop-shadow(0 3px 2px #0006); }
@@ -1546,9 +1610,10 @@ button { color: inherit; }
 .shop-purchase {
   margin-top: 10px;
   padding: 10px;
-  border: 1px solid #ffe19a44;
+  border: 1px solid rgba(185, 241, 242, .3);
   border-radius: 14px;
-  background: #07170e66;
+  background: linear-gradient(rgba(12, 65, 70, .62), rgba(3, 36, 48, .76));
+  box-shadow: inset 0 1px 0 #ffffff20;
 }
 .shop-purchase[hidden] { display: none; }
 .purchase-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -1559,7 +1624,7 @@ button { color: inherit; }
   height: 32px;
   border: 1px solid #ffe39b55;
   border-radius: 9px;
-  background: #39533e;
+  background: linear-gradient(#397f79, #12505c);
   color: white;
   font-size: 19px;
   font-weight: 900;
@@ -1570,7 +1635,7 @@ button { color: inherit; }
   height: 32px;
   border: 1px solid #ffffff24;
   border-radius: 9px;
-  background: #101d16;
+  background: #052b35;
   color: white;
   font-weight: 900;
   text-align: center;
@@ -1604,21 +1669,21 @@ button { color: inherit; }
   aspect-ratio: 1;
   place-items: center;
   padding: 7px 5px 5px;
-  border: 2px solid rgba(255, 222, 142, .25);
+  border: 1px solid rgba(181, 239, 241, .3);
   border-radius: 13px;
-  background: linear-gradient(145deg, rgba(69, 83, 57, .82), rgba(24, 39, 30, .92));
-  box-shadow: inset 0 2px 0 #ffffff12, 0 3px 0 #09170f99;
+  background: linear-gradient(145deg, rgba(37, 111, 108, .66), rgba(4, 43, 55, .86));
+  box-shadow: inset 0 1px 0 #ffffff32, 0 4px 9px #00151f66;
 }
-.inventory-slot.filled { border-color: rgba(207, 239, 112, .55); }
+.inventory-slot.filled { border-color: rgba(255, 226, 143, .55); }
 .inventory-slot.sellable {
   color: inherit;
   cursor: pointer;
   transition: border-color .15s ease, filter .15s ease, transform .15s ease;
 }
-.inventory-slot.sellable:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.inventory-slot.sellable:hover { border-color: #8ef2ea; filter: brightness(1.12); transform: translateY(-2px); box-shadow: 0 0 14px #61e9df44; }
 .inventory-slot.sellable.selected {
   border-color: #ffd66e;
-  box-shadow: inset 0 0 0 2px #ffd66e33, 0 3px 0 #09170f99;
+  box-shadow: inset 0 0 0 1px #ffd66e55, 0 0 16px #61e9df44;
 }
 .inventory-slot.empty { opacity: .42; }
 .inventory-slot .slot-icon {
@@ -1629,7 +1694,7 @@ button { color: inherit; }
 .inventory-slot .slot-name {
   overflow: hidden;
   width: 100%;
-  color: #dbe7d4;
+  color: #e6faf6;
   font-size: 9px;
   text-align: center;
   text-overflow: ellipsis;
@@ -1642,7 +1707,7 @@ button { color: inherit; }
   min-width: 19px;
   padding: 1px 4px;
   border-radius: 8px;
-  background: #101d16dd;
+  background: #052b35e8;
   color: #fff7c8;
   font-size: 10px;
   text-align: center;

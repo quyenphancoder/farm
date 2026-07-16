@@ -1000,16 +1000,28 @@
           `<div class="drawer-loading">${tr("common.loading")}</div>`;
         htmx.ajax("GET", url, { target: "#drawer-content", swap: "innerHTML" });
       }
+      function openRemoteGameModal(url) {
+        const content = document.createElement("div");
+        content.id = "game-modal-remote-content";
+        content.innerHTML = `<div class="drawer-loading">${tr("common.loading")}</div>`;
+        openGameModal({ content });
+        htmx.ajax("GET", url, {
+          target: "#game-modal-remote-content",
+          swap: "innerHTML"
+        });
+        return content;
+      }
       function openShop() {
-        openDrawer("popup");
-        loadDrawerContent("/api/shop");
+        openRemoteGameModal("/api/shop");
       }
       function openInventory() {
-        openDrawer("popup");
         if (!window.onlineBattleState?.active) {
-          loadDrawerContent("/api/game/inventory");
+          openRemoteGameModal("/api/game/inventory");
           return;
         }
+
+        const modalContent = document.createElement("div");
+        openGameModal({ content: modalContent });
 
         const farmScene = window.farmGame?.scene.getScene("FarmScene");
         const counts = farmScene?.crops?.inventoryCounts || new Map();
@@ -1037,7 +1049,7 @@
           { length: totalSlots - occupiedSlots.length },
           () => `<div class="inventory-slot empty" aria-label="${tr("inventory.empty")}"></div>`
         );
-        document.getElementById("drawer-content").innerHTML = `
+        modalContent.innerHTML = `
           <section class="inventory-panel">
             <h2 class="drawer-title">${tr("inventory.title")}</h2>
             <p class="drawer-subtitle">${tr("online.battleInventory")}</p>
