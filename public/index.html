@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#173b2c" />
-    <title>Linh Điền Ký — Spirit Fields Chronicle</title>
+    <title>Linh Điền Ký</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
@@ -53,7 +53,7 @@
         <div id="start-screen" class="start-screen" role="dialog" aria-modal="true"
           aria-labelledby="start-title">
           <section class="start-card">
-            <span class="start-emblem" aria-hidden="true">🌻</span>
+            <span class="start-emblem" aria-hidden="true">✦</span>
             <label class="language-picker">
               <select id="language-select" aria-label="Language" onchange="changeLanguage(this.value)">
                 <option value="vi">Tiếng Việt</option>
@@ -61,8 +61,7 @@
               </select>
             </label>
             <p class="start-eyebrow" data-i18n="start.welcome">Chào mừng trở lại</p>
-            <h1 id="start-title">Linh Điền Ký</h1>
-            <p class="start-english-title">Spirit Fields Chronicle</p>
+            <h1 id="start-title" data-i18n="game.title">Linh Điền Ký</h1>
             <p id="start-message" class="start-message" data-i18n="start.finding">Đang tìm nông trại của bạn…</p>
 
             <section id="auth-panel" class="auth-panel">
@@ -274,6 +273,7 @@
       }
 
       function applyTranslations() {
+        document.title = tr("game.title");
         document.querySelectorAll("[data-i18n]").forEach((element) => {
           const values = element.dataset.i18nLevel
             ? { level: element.dataset.i18nLevel }

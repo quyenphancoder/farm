@@ -98,6 +98,7 @@
   "nav.closeMenu": "Close menu",
   "drawer.label": "Information panel",
   "game.farmLabel": "Spirit Fields Chronicle",
+  "game.title": "Spirit Fields Chronicle",
   "game.avatarAlt": "Spirit farmer of the Spirit Fields Chronicle",
   "game.loadFailed": "Unable to sense the spirit-field records.",
   "game.serverFailed": "Unable to connect to the server.",
