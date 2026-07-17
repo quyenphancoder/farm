@@ -42,10 +42,21 @@ router.post("/register", (req, res) => {
   let userId;
   try {
     runTransaction(db, () => {
+      // Legacy databases may contain players created before authentication was
+      // introduced. Pick an id that is free in both sides of the one-to-one
+      // users/players relationship instead of relying only on users' sequence.
+      const nextId = db.prepare(`
+        SELECT MAX(id) + 1 AS id
+        FROM (
+          SELECT id FROM users
+          UNION ALL
+          SELECT id FROM players
+        )
+      `).get().id || 1;
       const result = db.prepare(`
-        INSERT INTO users (username, password_hash, password_salt, display_name)
-        VALUES (?, ?, ?, ?)
-      `).run(username, passwordHash, salt, displayName);
+        INSERT INTO users (id, username, password_hash, password_salt, display_name)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(nextId, username, passwordHash, salt, displayName);
       userId = Number(result.lastInsertRowid);
       db.prepare(`
         INSERT INTO players (id, name, coins, diamonds, level, xp, unlocked_rows, is_initialized)
@@ -53,7 +64,7 @@ router.post("/register", (req, res) => {
       `).run(userId, displayName);
     });
   } catch (error) {
-    if (String(error.message).includes("UNIQUE")) {
+    if (String(error.message).includes("UNIQUE constraint failed: users.username")) {
       return res.status(409).json({ error: "Tên đăng nhập đã tồn tại." });
     }
     throw error;

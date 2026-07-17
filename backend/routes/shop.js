@@ -7,6 +7,7 @@ const router = Router();
 
 router.get("/", (req, res) => {
   const text = (key, values) => t(req.language, key, values);
+  const price = (key) => `<span class="product-price"><img src="/assets/tiles/gold.png" alt="" aria-hidden="true">${text(key)}</span>`;
   const playerLevel = req.app.locals.db
     .prepare("SELECT level FROM players WHERE id = current_player_id()")
     .get().level;
@@ -16,7 +17,7 @@ router.get("/", (req, res) => {
           data-item="corn_seed" data-price="4" onclick="selectShopItem(this)">
           <span class="product-icon">🌽</span>
           <strong>${text("item.cornSeed")}</strong>
-          <small>${text("shop.perCornSeed")}</small>
+          ${price("shop.perCornSeed")}
         </button>
       `
     : `
@@ -36,25 +37,25 @@ router.get("/", (req, res) => {
           data-item="carrot_seed" data-price="2" onclick="selectShopItem(this)">
           <span class="product-icon">🌱</span>
           <strong>${text("item.carrotSeed")}</strong>
-          <small>${text("shop.perSeed")}</small>
+          ${price("shop.perSeed")}
         </button>
         <button class="shop-product" type="button" data-name="${text("item.pesticide")}"
           data-item="pesticide" data-price="5" onclick="selectShopItem(this)">
           <span class="product-icon">🧴</span>
           <strong>${text("item.pesticide")}</strong>
-          <small>${text("shop.perBottle")}</small>
+          ${price("shop.perBottle")}
         </button>
         <button class="shop-product" type="button" data-name="${text("item.chicken")}"
           data-item="chicken" data-price="120" onclick="selectShopItem(this)">
           <span class="product-icon">🐔</span>
           <strong>${text("item.chicken")}</strong>
-          <small>${text("shop.perChicken")}</small>
+          ${price("shop.perChicken")}
         </button>
         <button class="shop-product" type="button" data-name="${text("item.duck")}"
           data-item="duck" data-price="140" onclick="selectShopItem(this)">
           <span class="product-icon">🦆</span>
           <strong>${text("item.duck")}</strong>
-          <small>${text("shop.perDuck")}</small>
+          ${price("shop.perDuck")}
         </button>
         ${cornProduct}
         <button class="shop-product" type="button" disabled>

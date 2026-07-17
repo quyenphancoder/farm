@@ -539,7 +539,21 @@ button { color: inherit; }
 }
 .farm-layout-editor button:hover { filter: brightness(1.2); }
 .game-modal__choice small { color: #ffe27b; }
-.game-modal__price { color: #fff1b8; font-size: 15px; font-weight: 900; }
+.game-modal__price {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #fff1b8;
+  font-size: 15px;
+  font-weight: 900;
+}
+.game-modal__price-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px #42c8ff66);
+}
 .game-modal__content { scrollbar-width: none; }
 .game-modal__content::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
@@ -1721,6 +1735,204 @@ button { color: inherit; }
 }
 .inventory-sale { margin-top: 12px; }
 #inventory-sale-result { min-height: 20px; margin-top: 8px; color: #a9ef73; font-weight: 800; }
+
+/* Tiên hiệp treatment for resources, Vạn Bảo Linh Các and Túi Càn Khôn. */
+.resource-pill {
+  border-color: rgba(226, 196, 112, .48);
+  background:
+    linear-gradient(135deg, rgba(255, 239, 174, .09), transparent 42%),
+    linear-gradient(180deg, rgba(27, 91, 78, .9), rgba(5, 38, 43, .96));
+  box-shadow: inset 0 1px 0 #fff5c44a, inset 0 -1px 0 #061b18, 0 4px 10px #00171388;
+}
+.resource-pill .resource-icon {
+  border: 1px solid rgba(238, 205, 117, .32);
+  background: radial-gradient(circle at 45% 36%, rgba(255, 238, 167, .24), rgba(7, 47, 44, .75) 70%);
+  box-shadow: inset 0 0 8px #e9c76c22, 0 0 8px #71dfbf22;
+}
+.resource-pill strong { color: #fff0b0; text-shadow: 0 1px 2px #001b18, 0 0 8px #e8cc7040; }
+
+.shop-panel,
+.inventory-panel {
+  position: relative;
+  isolation: isolate;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(223, 193, 107, .42);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% -18%, rgba(112, 226, 190, .18), transparent 47%),
+    linear-gradient(145deg, rgba(16, 72, 62, .58), rgba(3, 31, 37, .72));
+  box-shadow: inset 0 0 0 1px #84d9bd12, inset 0 1px 0 #fff0ba2b, 0 10px 30px #00151755;
+}
+.shop-panel::before,
+.inventory-panel::before {
+  position: absolute;
+  z-index: -1;
+  inset: 7px;
+  border: 1px solid rgba(225, 196, 111, .16);
+  border-radius: 13px;
+  content: "";
+  pointer-events: none;
+}
+.shop-panel::after,
+.inventory-panel::after {
+  position: absolute;
+  z-index: -1;
+  right: -42px;
+  bottom: -52px;
+  width: 150px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(112, 218, 185, .13);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 14px #79d8b70a, inset 0 0 0 15px #dfc06b16, inset 0 0 0 32px #79d8b708;
+  content: "";
+  pointer-events: none;
+}
+.shop-panel .drawer-title,
+.inventory-panel .drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffe8a1;
+  letter-spacing: .055em;
+  text-shadow: 0 2px 0 #533e1d, 0 0 16px #e5c16c42;
+}
+.shop-panel .drawer-title::before,
+.inventory-panel .drawer-title::before {
+  display: grid;
+  flex: 0 0 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #efd78699;
+  border-radius: 9px 4px 9px 4px;
+  background: linear-gradient(145deg, #a84c35, #70291f);
+  color: #ffeeb7;
+  box-shadow: inset 0 0 0 2px #3c171888, 0 3px 10px #001a1888;
+  font: 900 18px/1 serif;
+  text-shadow: 0 1px 0 #491810;
+}
+.shop-panel .drawer-title::before { content: "寶"; }
+.inventory-panel .drawer-title::before { content: "乾"; }
+.shop-panel .drawer-subtitle,
+.inventory-panel .drawer-subtitle { color: #a9d9ca; }
+
+.shop-grid { gap: 10px; }
+.shop-product {
+  min-height: 96px;
+  border-color: rgba(218, 190, 108, .34);
+  border-radius: 12px 4px 12px 4px;
+  background:
+    linear-gradient(145deg, rgba(255, 238, 174, .08), transparent 42%),
+    linear-gradient(160deg, rgba(31, 103, 84, .88), rgba(5, 43, 49, .95));
+  box-shadow: inset 0 1px 0 #fff4c33b, inset 0 -1px 0 #001e20, 0 5px 12px #00151970;
+}
+.shop-product::before,
+.inventory-slot::before {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(240, 211, 126, .12);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+.shop-product:hover {
+  border-color: #f2d47cb3;
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 #fff4c366, 0 0 18px #71dfbd3d, 0 7px 14px #00151988;
+}
+.shop-product.selected {
+  border-color: #ffe59b;
+  background: linear-gradient(155deg, rgba(76, 145, 102, .95), rgba(10, 61, 58, .98));
+  box-shadow: inset 0 0 0 1px #ffe59b40, 0 0 20px #d8bd6260;
+}
+.shop-product .product-icon {
+  display: grid;
+  width: 45px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid #e7cb7950;
+  border-radius: 50%;
+  background: radial-gradient(circle, #dff8d71f, #082f31b8 72%);
+  font-size: 30px;
+  box-shadow: inset 0 0 12px #8ce1b928;
+}
+.shop-product strong { color: #f6ffea; }
+.product-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #f5d77e;
+  font-size: 10px;
+  font-weight: 900;
+}
+.product-price img { width: 16px; height: 16px; object-fit: contain; filter: drop-shadow(0 1px 2px #0008); }
+.shop-product .product-lock {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #d7bb7355;
+  border-radius: 50%;
+  background: #092d31e8;
+}
+
+.shop-purchase {
+  border-color: rgba(226, 197, 113, .4);
+  border-radius: 12px 4px 12px 4px;
+  background: linear-gradient(145deg, rgba(38, 100, 78, .74), rgba(4, 39, 44, .9));
+  box-shadow: inset 0 1px 0 #fff2b933, 0 5px 14px #00161a66;
+}
+.quantity-picker button {
+  border-color: #e8cd7d66;
+  background: linear-gradient(#4d9173, #18534e);
+  color: #fff1b1;
+}
+.quantity-picker input { border-color: #dfc4774a; background: #052f31; color: #fff1b1; }
+.buy-button {
+  border-color: #fff0aa99;
+  border-radius: 10px 3px 10px 3px;
+  background: linear-gradient(180deg, #f2da87, #b77b30);
+  color: #38230c;
+  box-shadow: inset 0 1px 0 #fffbd2, 0 4px 0 #68441c, 0 7px 14px #00161777;
+  text-shadow: 0 1px 0 #fff1b066;
+}
+.buy-button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+.inventory-grid { gap: 9px; }
+.inventory-slot {
+  border-color: rgba(185, 217, 180, .28);
+  border-radius: 11px 3px 11px 3px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(158, 226, 190, .12), transparent 48%),
+    linear-gradient(150deg, rgba(27, 91, 76, .82), rgba(4, 38, 43, .94));
+  box-shadow: inset 0 1px 0 #eefdc62b, inset 0 -1px 0 #001a1e, 0 4px 10px #00151966;
+}
+.inventory-slot.filled { border-color: rgba(232, 204, 121, .58); }
+.inventory-slot.sellable:hover {
+  border-color: #f0d581;
+  box-shadow: inset 0 0 0 1px #f0d5812e, 0 0 17px #72dfba44;
+}
+.inventory-slot.sellable.selected {
+  border-color: #ffe49a;
+  background: linear-gradient(145deg, rgba(67, 133, 94, .9), rgba(8, 55, 53, .96));
+  box-shadow: inset 0 0 0 1px #ffe49a40, 0 0 18px #e3c66c4c;
+}
+.inventory-slot .slot-name { color: #dff4e8; font-weight: 800; }
+.inventory-slot .slot-quantity {
+  border: 1px solid #e8cc7955;
+  background: #123f3be8;
+  color: #ffe9a2;
+  box-shadow: 0 2px 5px #001a1b88;
+}
+.inventory-slot.empty { opacity: .32; filter: saturate(.7); }
+.inventory-slot.empty::after {
+  width: 20%;
+  border: 1px solid #d9c98566;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px #8fe0bd1e;
+}
 .quest-list-popup { display: grid; gap: 10px; }
 .quest-list-popup .quest-row { margin: 0; padding: 12px; border-radius: 13px; }
 .quest-list-popup .quest-icon { font-size: 31px; }

@@ -5,7 +5,7 @@ import { t } from "../i18n.js";
 // Persistent solo-game routes.
 const router = Router();
 const LAND_UNLOCK_COST = 50;
-const TOTAL_PLOTS = 50;
+const TOTAL_PLOTS = 40;
 const CROP_GROWTH_MS = 10000;
 const WATER_COLLECTION_MS = 3000;
 const HARVEST_XP = 10;

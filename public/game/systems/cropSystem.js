@@ -16,11 +16,11 @@ export default class CropSystem {
     // === TỌA ĐỘ CÁC Ô ĐẤT CÓ THỂ CHỈNH TẠI ĐÂY ===
     const debugLayout = scene.farmLayout?.plots || {};
     this.layout = {
-      rows: 5,
+      rows: 4,
       cols: 10,
       patchCols: 5,
       plotWidth: debugLayout.plotWidth ?? 44,
-      plotHeight: debugLayout.plotHeight ?? 44,
+      plotHeight: debugLayout.plotWidth ?? 44,
       plotSpacingX: debugLayout.plotSpacingX ?? 62,
       plotSpacingY: debugLayout.plotSpacingY ?? 50,
       patchGapX: debugLayout.patchGapX ?? 142,
@@ -394,7 +394,19 @@ export default class CropSystem {
     this.closeConfirmPopup();
     const price = document.createElement("p");
     price.className = "game-modal__price";
-    price.textContent = this.t("plot.price", { cost: this.landUnlockCost });
+    const diamondIcon = document.createElement("img");
+    diamondIcon.className = "game-modal__price-icon";
+    diamondIcon.src = "/assets/tiles/diamond.png";
+    diamondIcon.alt = "";
+    diamondIcon.setAttribute("aria-hidden", "true");
+    const [pricePrefix, priceSuffix = ""] = this
+      .t("plot.price", { cost: this.landUnlockCost })
+      .split("💎");
+    price.append(
+      document.createTextNode(pricePrefix.trimEnd()),
+      diamondIcon,
+      document.createTextNode(priceSuffix.trimStart())
+    );
     this.confirmPopup = true;
     window.openGameModal({
       title: this.t("plot.buyQuestion"),
@@ -598,7 +610,10 @@ export default class CropSystem {
   applyDebugLayout(nextLayout = {}) {
     const offsetX = this.scene.mapOffsetX || 0;
     const offsetY = this.scene.mapOffsetY || 0;
+    const plotSize = nextLayout.plotWidth ?? this.layout.plotWidth;
     Object.assign(this.layout, nextLayout, {
+      plotWidth: plotSize,
+      plotHeight: plotSize,
       gridCenterX: (nextLayout.gridCenterX ?? 486) + offsetX,
       gridStartY: (nextLayout.gridStartY ?? 280) + offsetY
     });

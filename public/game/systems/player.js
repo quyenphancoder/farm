@@ -1,18 +1,18 @@
 export default class Player {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.baseScaleX = .32;
-    this.baseScaleY = .30;
+    this.baseScaleX = .39;
+    this.baseScaleY = .39;
     this.lastDirection = "down";
     this.actionUntil = 0;
-    this.sprite = scene.physics.add.sprite(x, y, "farmer-down-0");
+    this.sprite = scene.physics.add.sprite(x, y, "farmer-aligned", 0);
     this.sprite
-      .setOrigin(.55, .91)
+      .setOrigin(.5, .92)
       .setScale(this.baseScaleX, this.baseScaleY)
       .setCollideWorldBounds(true)
       .setDepth(20);
     this.shadowOffsetX = this.sprite.originX - .5;
-    this.sprite.body.setSize(54, 34).setOffset(42, 176);
+    this.sprite.body.setSize(40, 25).setOffset(44, 144);
     this.shadow = scene.add.ellipse(x, y + 5, 34, 12, 0x102015, .4)
       .setDepth(19);
     this.createAnimations();
@@ -87,14 +87,17 @@ export default class Player {
   }
 
   createAnimations() {
-    for (const direction of ["down", "up", "left", "right"]) {
+    const directionRows = { down: 0, up: 1, left: 2, right: 3 };
+    for (const [direction, row] of Object.entries(directionRows)) {
       const key = `farmer-walk-${direction}`;
       if (this.scene.anims.exists(key)) continue;
-      const sequence = [1, 2, 3, 4];
       this.scene.anims.create({
         key,
-        frames: sequence.map((index) => ({ key: `farmer-${direction}-${index}` })),
-        frameRate: 5,
+        frames: this.scene.anims.generateFrameNumbers("farmer-aligned", {
+          start: row * 12,
+          end: row * 12 + 11
+        }),
+        frameRate: 12,
         repeat: -1
       });
     }
@@ -177,7 +180,8 @@ export default class Player {
 
   setIdleFrame() {
     if (this.sprite.anims.isPlaying) this.sprite.anims.stop();
-    this.sprite.setTexture(`farmer-${this.lastDirection}-0`);
+    const idleFrames = { down: 0, up: 12, left: 24, right: 36 };
+    this.sprite.setTexture("farmer-aligned", idleFrames[this.lastDirection]);
   }
 
   updateShadow() {
