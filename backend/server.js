@@ -141,7 +141,7 @@ function ensureFarmStateColumn(db, name, definition) {
 
 function migratePlotGrid(db) {
   const version = db.prepare("PRAGMA user_version").get().user_version;
-  if (version >= 2) return;
+  if (version >= 4) return;
 
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -167,7 +167,53 @@ function migratePlotGrid(db) {
         SELECT id, 9 FROM players WHERE is_initialized = 1;
       `);
     }
-    db.exec("PRAGMA user_version = 2");
+    if (version < 3) {
+      for (const table of ["farm_state", "unlocked_plots"]) {
+        db.exec(`
+          DELETE FROM ${table}
+          WHERE (plot_id % 10) IN (4, 9) AND plot_id BETWEEN 0 AND 49;
+
+          UPDATE ${table}
+          SET plot_id = 1000
+            + CAST(plot_id / 10 AS INTEGER) * 8
+            + CASE
+                WHEN (plot_id % 10) < 4 THEN plot_id % 10
+                ELSE (plot_id % 10) - 1
+              END
+          WHERE plot_id BETWEEN 0 AND 49;
+
+          UPDATE ${table}
+          SET plot_id = plot_id - 1000
+          WHERE plot_id >= 1000;
+        `);
+      }
+    }
+    if (version < 4) {
+      for (const table of ["farm_state", "unlocked_plots"]) {
+        db.exec(`
+          UPDATE ${table}
+          SET plot_id = 1000
+            + CAST(plot_id / 8 AS INTEGER) * 10
+            + CASE
+                WHEN (plot_id % 8) < 4 THEN plot_id % 8
+                ELSE (plot_id % 8) + 1
+              END
+          WHERE plot_id BETWEEN 0 AND 39;
+
+          UPDATE ${table}
+          SET plot_id = plot_id - 1000
+          WHERE plot_id >= 1000;
+        `);
+      }
+      db.exec(`
+        INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id)
+        SELECT id, 4 FROM players WHERE is_initialized = 1;
+
+        INSERT OR IGNORE INTO unlocked_plots (player_id, plot_id)
+        SELECT id, 9 FROM players WHERE is_initialized = 1;
+      `);
+    }
+    db.exec("PRAGMA user_version = 4");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

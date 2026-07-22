@@ -16,14 +16,14 @@ const DEFAULT_FARM_LAYOUT = {
   farmGate: { x: 543, y: 535, width: 100, height: 65, entranceX: 540, entranceY: 500 },
   plots: {
     "plotWidth": 50,
-    "plotHeight": 40,
+    "plotHeight": 50,
     "plotSpacingX": 60,
-    "plotSpacingY": 44,
+    "plotSpacingY": 54,
     "patchGapX": 80,
     "leftPatchOffsetX": -40,
     "rightPatchOffsetX": 45,
     "gridCenterX": 486,
-    "gridStartY": 273
+    "gridStartY": 280
   }
 };
 const FARM_LAYOUT_STORAGE_KEY = "sunnyfarmFarmLayout";
@@ -662,7 +662,7 @@ export default class FarmScene extends Phaser.Scene {
       { block: 4, x: 80, y: 310, width: 70, height: 440 },
       { block: 5, x: 1000, y: 310, width: 70, height: 440 },
       { block: 6, x: 550, y: 60, width: 300, height: 90 },
-      { block: 7, x: 550, y: 560, width: 900, height: 78 },
+      { block: 7, x: 550, y: 540, width: 900, height: 78 },
       { block: 8, x: 400, y: 100, width: 100, height: 70 },
       { block: 9, x: 690, y: 120, width: 100, height: 70 },
     ];
